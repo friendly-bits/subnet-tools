@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# tests for expand_ipv6 and compress_ipv6
+# tests expand_ipv6(), compress_ipv6() and validate_ip()
 
 #### Initial setup
 
@@ -13,7 +13,6 @@ script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 export test_cut_ip="true"
 . "$script_dir/cut-ip.sh" || { echo "$me: Error: Can't source '$script_dir/cut-ip.sh'." >&2; exit 1; }
 
-# unit tests for compress_ipv6
 test_exp_comp_ipv6(){
 
 tests=" \
