@@ -10,7 +10,7 @@ script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 # shellcheck disable=SC2015
 [ -n "$script_dir" ] && cd "$script_dir" || { echo "$me: Error: Couldn't cd into '$script_dir'." >&2; exit 1; }
 
-export test_cut_ip="true"
+export test_get-subnet="true"
 . "$script_dir/cut-ip.sh" || { echo "$me: Error: Can't source '$script_dir/cut-ip.sh'." >&2; exit 1; }
 
 test_exp_comp_ipv6(){
