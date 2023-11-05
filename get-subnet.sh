@@ -26,7 +26,7 @@ hex2dec() (
 	done
 )
 
-# converts given ip address into 16 1-byte chunks
+# converts given ip address into 1-byte chunks
 ip_to_bytes() (
 	ip="$1"
 	family="$2"
