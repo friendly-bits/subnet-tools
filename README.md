@@ -2,8 +2,8 @@
 Shell script that trims an ipv4 or ipv6 address to a given length, and outputs resulting subnet: ip with mask bits.
 
 Examples:
-- Input: '**192.168.4.112/12**' inet. Output: '**192.160.0.0/12**'
-- Input: '**2001:4567:1111:56ff::1/42**' inet6. Output: '**2001:4567:1100::/42**'
+- Input: '**192.168.4.111/12**'. Output: '**192.160.0.0/12**'
+- Input: '**2001:4567:1111:56ff::1/42**'. Output: '**2001:4567:1100::/42**'
 
 This is a modified and improved version of a script found here:
 https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
@@ -13,8 +13,8 @@ Requires _awk_, _grep_ with ERE support, _sed_ and some additional standard Unix
 Only tested with GNU variants, and only on Linux.
 Probably should work on other Unixes but may need slight modifications.
 
-The script is not particularly fast because it's doing a lot of validation. One run takes about 0.1s, depending on the CPU.
-If you want to put a lot of addresses through it, the validation code can be removed and it'll work much faster.
+The script is not particularly fast because it's doing a lot of validation and error checking. One run takes about 0.1s (for ipv6), depending on the CPU.
+If you want to put a lot of addresses through it, the validation code can be removed and it should work much faster.
 
 The second script (_get-subnet-tests.sh_) tests some functions found in the main script. It's not required for the main script.
 
