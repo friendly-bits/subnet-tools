@@ -45,10 +45,10 @@ ip_to_bytes() (
 expand_ipv6() (
 	addr="$1"
 	# prepend 0 if we start with :
-	printf "%s" "$addr" | grep -qs "^:" && addr="0${addr}"
+	printf "%s" "$addr" | grep "^:" >/dev/null 2>/dev/null && addr="0${addr}"
 
 	# expand ::
-	if printf "%s" "$addr" | grep -qs "::"; then
+	if printf "%s" "$addr" | grep "::" >/dev/null 2>/dev/null; then
 		colons=$(printf "%s" "$addr" | sed 's/[^:]//g')
 		missing=$(printf "%s" ":::::::::" | sed "s/$colons//")
 		expanded=$(printf "%s" "$missing" | sed 's/:/:0/g')
@@ -68,7 +68,7 @@ expand_ipv6() (
 # expects fully expanded ipv6 address as input, otherwise may produce incorrect results
 compress_ipv6 () (
 	addr="$1"
-	compress_var="$(printf "%s" "$addr" | sed -e 's/::/:0:/g' | grep -o "[0-9a-f]\+" | while read -r compress_var_hex; do [ -n "$compress_var_hex" ] && \
+	compress_var="$(printf "%s" "$addr" | sed -e 's/::/:0:/g' | tr ':' '\n' | while read -r compress_var_hex; do [ -n "$compress_var_hex" ] && \
 		printf ":%x" "$((0x$compress_var_hex))"; done)"
 	for zero_chain in :0:0:0:0:0:0:0:0 :0:0:0:0:0:0:0 :0:0:0:0:0:0 :0:0:0:0:0 :0:0:0:0 :0:0:0 :0:0
 	do
@@ -143,6 +143,8 @@ validate_ip () (
 	# chop off mask bits
 	addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
 
+	[ -z "$addr" ] && { echo "validate_ip(): Error: received an empty ip address." >&2; return 1; }
+	[ -z "$family" ] && { echo "validate_ip(): Error: received no value for ip family." >&2; return 1; }
 
 	case "$family" in
 		inet )
@@ -160,7 +162,7 @@ validate_ip () (
 					{ echo "validate_ip(): Error: failed to validate $family mask bits '$maskbits' with 'grep -E ${maskbits_regex_ipv6}'." >&2; return 1; }
 			fi
 			printf "%s" "$addr" | grep -E "${ipv6_regex}" > /dev/null || \
-				{ echo "validate_ip(): Error: failed to validate ipv6 address: '$addr' with 'grep -E ${ipv6_regex}'." >&2; return 1; }
+				{ echo "validate_ip(): Error: failed to validate ipv6 address '$addr' with 'grep -E ${ipv6_regex}'." >&2; return 1; }
 		;;
 		* ) echo "validate_ip(): Error: invalid family '$family'" >&2; return 1
 	esac
@@ -222,7 +224,6 @@ main() (
 
 	validate_ip "${addr}/${maskbits}" "$family" || { echo "get-subnet: Error: ip '$addr' failed validation'"; return 1; }
 
-
 	ip_bytes="$(ip_to_bytes "$addr" "$family")" || { echo "Error converting ip to bytes" >&2; return 1; }
 	mask_bytes="$(mask "$maskbits")"
 
@@ -260,7 +261,7 @@ maskbits_regex_ipv4='^(3[0-2]|([1-2][0-9])|[8-9])$'
 
 
 # to test functions from external sourcing script, export the $test_get-subnet variable in that script
-if [ -z "$test_get-subnet" ]; then
+if [ -z "$test_get_subnet" ]; then
 	main "$1" || exit 1
 else return 0
 fi
