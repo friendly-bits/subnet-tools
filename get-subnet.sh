@@ -6,7 +6,7 @@
 
 # requires ip with mask bits in 1st arg. auto-detects the ip family.
 
-# this is a modified and improved version of a script found here:
+# this is a modified and (hopefully) improved version of a script found here:
 # https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
 # also used some input from here:
 # https://stackoverflow.com/questions/14697403/expand-ipv6-address-in-shell-script
