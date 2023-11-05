@@ -200,7 +200,6 @@ main() (
 	printf "%s" "32" | grep -E "${maskbits_regex_ipv4}" > /dev/null || rv=1
 	printf "%s" "0" | grep -E "${maskbits_regex_ipv4}" > /dev/null && rv=$((rv + 1))
 	[ "$rv" -ne 0 ] && { echo "get-subnet: Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
-	rv=0
 
  	# test 'ip route get'
 	ip route get "127.0.0.1" >/dev/null 2>/dev/null; rv_ipv4=$?
