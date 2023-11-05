@@ -19,6 +19,8 @@
 # convert hex to dec (portable version)
 hex2dec() (
 	hex="$*"
+	[ -z "$hex" ] && { echo "hex2dec(): Error: received an empty value." >&2; return 1; }
+
 	for i in $hex; do
 		printf "%d " "$(( 0x$i ))"
 	done
@@ -28,6 +30,9 @@ hex2dec() (
 ip_to_bytes() (
 	ip="$1"
 	family="$2"
+
+	[ -z "$addr" ] && { echo "ip_to_bytes(): Error: received an empty ip address." >&2; return 1; }
+	[ -z "$family" ] && { echo "ip_to_bytes(): Error: received no value for ip family." >&2; return 1; }
 
 	case "$family" in
 		inet )	printf "%s" "$ip" | tr '.' ' ' ;;
@@ -44,6 +49,9 @@ ip_to_bytes() (
 # expands given ipv6 address
 expand_ipv6() (
 	addr="$1"
+
+	[ -z "$addr" ] && { echo "expand_ipv6(): Error: received an empty ip address." >&2; return 1; }
+
 	# prepend 0 if we start with :
 	printf "%s" "$addr" | grep "^:" >/dev/null 2>/dev/null && addr="0${addr}"
 
@@ -68,6 +76,9 @@ expand_ipv6() (
 # expects fully expanded ipv6 address as input, otherwise may produce incorrect results
 compress_ipv6 () (
 	addr="$1"
+
+	[ -z "$addr" ] && { echo "compress_ipv6(): Error: received an empty ip address." >&2; return 1; }
+
 	compress_var="$(printf "%s" "$addr" | sed -e 's/::/:0:/g' | tr ':' '\n' | while read -r compress_var_hex; do [ -n "$compress_var_hex" ] && \
 		printf ":%x" "$((0x$compress_var_hex))"; done)"
 	for zero_chain in :0:0:0:0:0:0:0:0 :0:0:0:0:0:0:0 :0:0:0:0:0:0 :0:0:0:0:0 :0:0:0:0 :0:0:0 :0:0
@@ -91,6 +102,9 @@ format_ip() (
 	bytes="$1"
 	family="$2"
 
+	[ -z "$bytes" ] && { echo "format_ip(): Error: received empty value instead of bytes." >&2; return 1; }
+	[ -z "$family" ] && { echo "format_ip(): Error: received empty value for ip family." >&2; return 1; }
+
 	case "$family" in
 		inet )
 			# shellcheck disable=SC2086
@@ -113,6 +127,7 @@ format_ip() (
 # generates a mask represented as 16 1-byte hex chunks
 mask() (
 	maskbits="$1"
+	[ -z "$maskbits" ] && { echo "mask(): Error: received empty value instead of mask bits." >&2; return 1; }
 
 	res=""
 	for i in $(seq 0 15); do
