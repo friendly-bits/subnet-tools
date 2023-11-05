@@ -175,7 +175,7 @@ validate_ip () (
 
 
 # Main
-cut_ip() (
+main() (
 	# check dependencies
 
 	# test grep -E
@@ -195,7 +195,22 @@ cut_ip() (
 
 
 	addr="$1"
-	family="$2"
+
+	# get mask bits
+	maskbits="$(printf "%s" "$addr" | awk -F/ '{print $2}')"
+
+	[ -z "$maskbits" ] && { echo "cut_ip(): Error: input '$addr' has no mask bits."; return 1; }
+
+	# chop off mask bits
+	addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
+
+
+	# detect the family
+	family=""
+	printf "%s" "$addr" | grep -E "${ipv4_regex}" > /dev/null && family="inet"
+	printf "%s" "$addr" | grep -E "${ipv6_regex}" > /dev/null && family="inet6"
+
+	[ -z "$family" ] && { echo "cut_ip(): Error: failed to detect the family for address '$addr'." >&2; return 1; }
 
 	[ "$family" = "inet" ] && [ ! "$rv_ipv4" ] && \
 		{ echo "cut_ip(): Can't process ipv4 addresses." >&2; return 1; }
@@ -203,14 +218,8 @@ cut_ip() (
 		{ echo "cut_ip(): Can't process ipv6 addresses." >&2; return 1; }
 	
 
-	# get mask bits
-	maskbits="$(printf "%s" "$addr" | awk -F/ '{print $2}')"
+	validate_ip "${addr}/${maskbits}" "$family" || { echo "cut_ip(): Error: ip '$addr' failed validation'"; return 1; }
 
-	[ -z "$maskbits" ] && { echo "cut_ip(): Error: input '$addr' has no mask bits."; return 1; }
-	validate_ip "$addr" "$family" || { echo "cut_ip(): Error: ip '$addr' failed validation'"; return 1; }
-
-	# chop off mask bits
-	addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
 
 	ip_bytes="$(ip_to_bytes "$addr" "$family")" || { echo "Error converting ip to bytes" >&2; return 1; }
 	mask_bytes="$(mask "$maskbits")"
@@ -250,6 +259,6 @@ maskbits_regex_ipv4='^(3[0-2]|([1-2][0-9])|[8-9])$'
 
 # to test functions from external sourcing script, export the $test_cut_ip variable in that script
 if [ -z "$test_cut_ip" ]; then
-	cut_ip "$1" "$2" || exit 1
+	main "$1" || exit 1
 else return 0
 fi
