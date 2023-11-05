@@ -75,8 +75,8 @@ fd0e:2146:5cf5:4560:0000:0000:0000:0001 fd0e:2146:5cf5:4560::1
 	done
 	return $((status_exp + status_comp))
 }
-
+status=$?
 test_exp_comp_ipv6
 echo
 echo "Tests done: $tests_done"
-echo "Test status: $?"
+echo "Test status: $status"
