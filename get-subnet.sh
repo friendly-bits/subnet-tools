@@ -237,14 +237,14 @@ main() (
 		{ echo "get-subnet: Can't process ipv6 addresses." >&2; return 1; }
 	
 
-	validate_ip "${addr}/${maskbits}" "$family" || { echo "get-subnet: Error: ip '$addr' failed validation'"; return 1; }
+	validate_ip "${addr}/${maskbits}" "$family" || { echo "get-subnet: Error: ip '$addr' failed validation.'"; return 1; }
 
-	ip_bytes="$(ip_to_bytes "$addr" "$family")" || { echo "Error converting ip to bytes" >&2; return 1; }
-	mask_bytes="$(mask "$maskbits")"
+	ip_bytes="$(ip_to_bytes "$addr" "$family")" || { echo "get-subnet: Error converting ip to bytes." >&2; return 1; }
+	mask_bytes="$(mask "$maskbits")" || { echo "get-subnet: Error generating mask bytes." >&2; return 1; }
 
 	[ "$family" = "inet6" ] && mask_len=128 || mask_len=32
 
-	# perform bit-wise AND on the address and the mask
+	# perform bitwise AND on the address and the mask
 	bytes=""
 	for i in $(seq 1 $(( mask_len/8 )) ); do
 		mask_byte="$(printf "%s" "$mask_bytes" | cut -d' ' -f "$i")"
