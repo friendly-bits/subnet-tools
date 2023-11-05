@@ -2,7 +2,7 @@
 
 # get-subnet.sh
 
-# cuts an ip to given length, outputs subnet with mask bits
+# trims an ip to given length (expressed in CIDR mask bits) and outputs the resulting subnet
 
 # requires ip with mask bits in 1st arg. auto-detects the ip family.
 
