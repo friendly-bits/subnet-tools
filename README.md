@@ -5,7 +5,7 @@ Examples:
 - Input: '**192.168.4.111/12**'. Output: '**192.160.0.0/12**'
 - Input: '**2001:4567:1111:56ff::1/42**'. Output: '**2001:4567:1100::/42**'
 
-This is a modified and improved version of a script found here:
+This is a modified and (hopefully) improved version of a script found here:
 https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
 
 The code should be POSIX-compatible (tested on dash and on bash).
