@@ -51,23 +51,23 @@ fd0e:2146:5cf5:4560:0000:0000:0000:0001 fd0e:2146:5cf5:4560::1
 			# compress_ipv6 test
 			result="$(compress_ipv6 "$expanded_ip")"
 			if [ "$result" != "$compressed_ip" ]; then
-				echo "compress_ipv6 '$expanded_ip': expected '$compressed_ip', got '$result'."
+				echo "Error in compress_ipv6 with input '$expanded_ip'. Expected '$compressed_ip', got '$result'."
 				status_comp=1
 			fi
 
 			# this tests the validate_ip() function
-			validate_ip "$result" "inet6" || echo "result failed validation: '$result'" >&2
+			validate_ip "$result" "inet6" || echo "Compressed ipv6 failed validation: '$result'." >&2
 
 
 			# expand_ipv6 test
 			result="$(expand_ipv6 "$compressed_ip")"
 			if [ "$result" != "$expanded_ip" ]; then
-				echo "compress_ipv6 '$compressed_ip': expected '$expanded_ip', got '$result'."
+				echo "Error in expand_ipv6 with input '$compressed_ip'. Expected '$expanded_ip', got '$result'."
 				status_exp=1
 			fi
 
 			# this tests the validate_ip() function
-			validate_ip "$result" "inet6" || echo "result failed validation: '$result'" >&2
+			validate_ip "$result" "inet6" || echo "Expanded ipv6 failed validation: '$result'." >&2
 
 
 			tests_done=$((tests_done+1))
