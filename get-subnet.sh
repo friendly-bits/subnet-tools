@@ -133,9 +133,9 @@ mask() (
 	printf "%s" "$res"
 )
 
-validate_ip () (
-# validates both ipv4 and ipv6 addresses, with or without mask bits
+# validates an ipv4 or ipv6 address, with or without mask bits
 # first performs regex validation, then runs the address through 'ip route get' command
+validate_ip () (
 	addr="$1"
 	family="$2"
 
