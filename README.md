@@ -14,7 +14,7 @@ Only tested with GNU variants, and only on Linux.
 Probably should work on other Unixes but may need slight modifications.
 
 The script is not particularly fast because it's doing a lot of validation and error checking. One run takes about 0.1s (for ipv6), depending on the CPU.
-If you want to put a lot of addresses through it, the validation code can be removed and it should work much faster.
+If you want to put a lot of addresses through it, the validation code can be removed and it should speed it up.
 
 The second script (_get-subnet-tests.sh_) tests some functions found in the main script. It's not required for the main script.
 
