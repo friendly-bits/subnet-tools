@@ -72,7 +72,7 @@ expand_ipv6() (
 	printf "%s" "$blocks"
 )
 
-# returns a compressed ipv6 address under the form recommended by RFC5952
+# returns a compressed ipv6 address in the format recommended by RFC5952
 # expects fully expanded ipv6 address as input, otherwise may produce incorrect results
 compress_ipv6 () (
 	addr="$1"
