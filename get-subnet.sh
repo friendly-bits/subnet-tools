@@ -182,17 +182,17 @@ main() (
 	rv=0
 	printf "%s" "32" | grep -E "${maskbits_regex_ipv4}" > /dev/null || rv=1
 	printf "%s" "0" | grep -E "${maskbits_regex_ipv4}" > /dev/null && rv=$((rv + 1))
-	[ "$rv" -ne 0 ] && { echo "cut_ip(): Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
+	[ "$rv" -ne 0 ] && { echo "get-subnet: Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
 	rv=0
 
  	# test 'ip route get'
 	ip route get "127.0.0.1" >/dev/null 2>/dev/null; rv_ipv4=$?
-	[ $rv_ipv4 -eq 1 ] && echo "cut_ip(): Warning: command 'ip addr get' is not working correctly on this machine for ipv4." >&2
+	[ $rv_ipv4 -eq 1 ] && echo "get-subnet: Warning: command 'ip addr get' is not working correctly on this machine for ipv4." >&2
 	ip route get "::1" >/dev/null 2>/dev/null; rv_ipv6=$?
-	[ $rv_ipv6 -eq 1 ] && echo "cut_ip(): Warning: command 'ip addr get' is not working correctly on this machine for ipv6." >&2
+	[ $rv_ipv6 -eq 1 ] && echo "get-subnet: Warning: command 'ip addr get' is not working correctly on this machine for ipv6." >&2
 
 	if [ ! "$rv_ipv4" ] && [ ! "$rv_ipv6" ]; then
-		echo "cut_ip(): Error: 'ip route get' command is not present or not working on this machine." >&2; return 1
+		echo "get-subnet: Error: 'ip route get' command is not present or not working on this machine." >&2; return 1
 	fi
 
 
@@ -201,7 +201,7 @@ main() (
 	# get mask bits
 	maskbits="$(printf "%s" "$addr" | awk -F/ '{print $2}')"
 
-	[ -z "$maskbits" ] && { echo "cut_ip(): Error: input '$addr' has no mask bits."; return 1; }
+	[ -z "$maskbits" ] && { echo "get-subnet: Error: input '$addr' has no mask bits."; return 1; }
 
 	# chop off mask bits
 	addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
@@ -212,15 +212,15 @@ main() (
 	printf "%s" "$addr" | grep -E "${ipv4_regex}" > /dev/null && family="inet"
 	printf "%s" "$addr" | grep -E "${ipv6_regex}" > /dev/null && family="inet6"
 
-	[ -z "$family" ] && { echo "cut_ip(): Error: failed to detect the family for address '$addr'." >&2; return 1; }
+	[ -z "$family" ] && { echo "get-subnet: Error: failed to detect the family for address '$addr'." >&2; return 1; }
 
 	[ "$family" = "inet" ] && [ ! "$rv_ipv4" ] && \
-		{ echo "cut_ip(): Can't process ipv4 addresses." >&2; return 1; }
+		{ echo "get-subnet: Can't process ipv4 addresses." >&2; return 1; }
 	[ "$family" = "inet6" ] && [ ! "$rv_ipv6" ] && \
-		{ echo "cut_ip(): Can't process ipv6 addresses." >&2; return 1; }
+		{ echo "get-subnet: Can't process ipv6 addresses." >&2; return 1; }
 	
 
-	validate_ip "${addr}/${maskbits}" "$family" || { echo "cut_ip(): Error: ip '$addr' failed validation'"; return 1; }
+	validate_ip "${addr}/${maskbits}" "$family" || { echo "get-subnet: Error: ip '$addr' failed validation'"; return 1; }
 
 
 	ip_bytes="$(ip_to_bytes "$addr" "$family")" || { echo "Error converting ip to bytes" >&2; return 1; }
@@ -244,7 +244,7 @@ main() (
 
 	# shellcheck disable=SC2015
 	validate_ip "$subnet" "$family" && { printf "%s\n" "$subnet"; return 0; } || \
-		{ echo "cut_ip(): Error converting '$addr/$maskbits' to subnet. Resulting subnet '$subnet' is invalid."; return 1; }
+		{ echo "get-subnet: Error converting '$addr/$maskbits' to subnet. Resulting subnet '$subnet' is invalid."; return 1; }
 )
 
 ### Constants
@@ -259,8 +259,8 @@ maskbits_regex_ipv6='^(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])$'
 maskbits_regex_ipv4='^(3[0-2]|([1-2][0-9])|[8-9])$'
 
 
-# to test functions from external sourcing script, export the $test_cut_ip variable in that script
-if [ -z "$test_cut_ip" ]; then
+# to test functions from external sourcing script, export the $test_get-subnet variable in that script
+if [ -z "$test_get-subnet" ]; then
 	main "$1" || exit 1
 else return 0
 fi
