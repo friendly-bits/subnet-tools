@@ -79,7 +79,7 @@ compress_ipv6 () (
 
 	[ -z "$addr" ] && { echo "compress_ipv6(): Error: received an empty ip address." >&2; return 1; }
 
-	compress_var="$(printf "%s" "$addr" | sed -e 's/::/:0:/g' | tr ':' '\n' | while read -r compress_var_hex; do [ -n "$compress_var_hex" ] && \
+	compress_var="$(printf "%s\n" "$addr" | sed -e 's/::/:0:/g' | tr ':' '\n' | while read -r compress_var_hex; do [ -n "$compress_var_hex" ] && \
 		printf ":%x" "$((0x$compress_var_hex))"; done)"
 	for zero_chain in :0:0:0:0:0:0:0:0 :0:0:0:0:0:0:0 :0:0:0:0:0:0 :0:0:0:0:0 :0:0:0:0 :0:0:0 :0:0
 	do
