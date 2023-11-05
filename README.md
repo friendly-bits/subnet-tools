@@ -8,9 +8,10 @@ Examples:
 This is a modified and (hopefully) improved version of a script found here:
 https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
 
-The code should be POSIX-compatible (tested on dash and on bash).
 Requires _awk_, _grep_ with ERE support, _sed_ and some additional standard Unix utilities like _tr_ and _cut_.
-Only tested with GNU variants, and only on Linux (works on OpenWRT as well as on desktop Linux distributions). Probably requires GNU'ish grep.
+
+The code is supposedly POSIX-compliant (tested on dash and on bash) and even some effort has been made to avoid using non-POSIX options of the abovementioned utilities.
+However, only tested with the GNU variants, and only on Linux (works on OpenWRT as well as on desktop Linux distributions).
 Probably should work on other Unixes but may need slight modifications.
 
 The script is not particularly fast because it's doing a lot of validation and error checking. One run takes about 0.1s (for ipv6), depending on the CPU.
