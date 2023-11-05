@@ -231,9 +231,9 @@ main() (
 
 	[ -z "$family" ] && { echo "get-subnet: Error: failed to detect the family for address '$addr'." >&2; return 1; }
 
-	[ "$family" = "inet" ] && [ ! "$rv_ipv4" ] && \
+	[ "$family" = "inet" ] && [ "$rv_ipv4" -eq 1 ] && \
 		{ echo "get-subnet: Can't process ipv4 addresses." >&2; return 1; }
-	[ "$family" = "inet6" ] && [ ! "$rv_ipv6" ] && \
+	[ "$family" = "inet6" ] && [ ! "$rv_ipv6" -eq 1 ] && \
 		{ echo "get-subnet: Can't process ipv6 addresses." >&2; return 1; }
 	
 
