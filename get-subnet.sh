@@ -32,7 +32,7 @@ ip_to_bytes() (
 	family="$2"
 
 	[ -z "$addr" ] && { echo "ip_to_bytes(): Error: received an empty ip address." >&2; return 1; }
-	[ -z "$family" ] && { echo "ip_to_bytes(): Error: received no value for ip family." >&2; return 1; }
+	[ -z "$family" ] && { echo "ip_to_bytes(): Error: received an empty value for ip family." >&2; return 1; }
 
 	case "$family" in
 		inet )	printf "%s" "$ip" | tr '.' ' ' ;;
@@ -159,7 +159,7 @@ validate_ip () (
 	addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
 
 	[ -z "$addr" ] && { echo "validate_ip(): Error: received an empty ip address." >&2; return 1; }
-	[ -z "$family" ] && { echo "validate_ip(): Error: received no value for ip family." >&2; return 1; }
+	[ -z "$family" ] && { echo "validate_ip(): Error: received empty value for ip family." >&2; return 1; }
 
 	case "$family" in
 		inet )
