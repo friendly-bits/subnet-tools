@@ -2,8 +2,8 @@
 Shell script that trims an ipv4 or ipv6 address to a given length, and outputs resulting subnet: ip with mask bits.
 
 Examples:
-- Input: _'192.168.4.112/12' inet_. Output: _'192.160.0.0/12'_
-- Input: _'2001:4567:1111:56ff::1/42' inet6_. Output: _'2001:4567:1100::/42'_
+- Input: '**192.168.4.112/12**' inet. Output: '**192.160.0.0/12**'
+- Input: '**2001:4567:1111:56ff::1/42**' inet6. Output: '**2001:4567:1100::/42**'
 
 This is a modified and improved version of a script found here:
 https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
