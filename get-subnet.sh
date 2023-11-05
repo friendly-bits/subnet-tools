@@ -192,7 +192,7 @@ main() (
 	[ $rv_ipv6 -eq 1 ] && echo "get-subnet: Warning: command 'ip addr get' is not working correctly on this machine for ipv6." >&2
 
 	if [ ! "$rv_ipv4" ] && [ ! "$rv_ipv6" ]; then
-		echo "get-subnet: Error: 'ip route get' command is not present or not working on this machine." >&2; return 1
+		echo "get-subnet: Error: 'ip route get' command is not present or not working as expected on this machine." >&2; return 1
 	fi
 
 
