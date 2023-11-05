@@ -4,7 +4,7 @@
 
 # cuts an ip to given length, outputs subnet with mask bits
 
-# requires ip with mask bits in 1st arg, ip family (inet or inet6) in 2nd arg
+# requires ip with mask bits in 1st arg. auto-detects the ip family.
 
 # this is a modified and improved version of a script found here:
 # https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
