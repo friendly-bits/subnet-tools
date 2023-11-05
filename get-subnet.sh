@@ -39,7 +39,7 @@ ip_to_bytes() (
 		inet6 )
 			expanded_ip="$(expand_ipv6 "$ip")"
 			validate_ip "$expanded_ip" "$family" || \
-				{ echo "ip_to_bytes(): Failed to expand ip '$ip'. Resulting address '$expanded_ip' is invalid."; return 1; }
+				{ echo "ip_to_bytes(): Failed to expand ip '$ip'. Resulting address '$expanded_ip' is invalid." >&2; return 1; }
 			split_exp_ip="$(printf "%s" "$expanded_ip" | tr -d ':' | sed 's/.\{2\}/& /g')"
 			hex2dec "$split_exp_ip" ;;
 		* ) echo "ip_to_bytes(): Error: invalid family '$family'" >&2; return 1 ;;
@@ -218,7 +218,7 @@ main() (
 	# get mask bits
 	maskbits="$(printf "%s" "$addr" | awk -F/ '{print $2}')"
 
-	[ -z "$maskbits" ] && { echo "get-subnet: Error: input '$addr' has no mask bits."; return 1; }
+	[ -z "$maskbits" ] && { echo "get-subnet: Error: input '$addr' has no mask bits." >&2; return 1; }
 
 	# chop off mask bits
 	addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
@@ -237,7 +237,7 @@ main() (
 		{ echo "get-subnet: Can't process ipv6 addresses." >&2; return 1; }
 	
 
-	validate_ip "${addr}/${maskbits}" "$family" || { echo "get-subnet: Error: ip '$addr' failed validation.'"; return 1; }
+	validate_ip "${addr}/${maskbits}" "$family" || { echo "get-subnet: Error: ip '$addr' failed validation.'" >&2; return 1; }
 
 	ip_bytes="$(ip_to_bytes "$addr" "$family")" || { echo "get-subnet: Error converting ip to bytes." >&2; return 1; }
 	mask_bytes="$(mask "$maskbits")" || { echo "get-subnet: Error generating mask bytes." >&2; return 1; }
@@ -260,7 +260,7 @@ main() (
 
 	# shellcheck disable=SC2015
 	validate_ip "$subnet" "$family" && { printf "%s\n" "$subnet"; return 0; } || \
-		{ echo "get-subnet: Error converting '$addr/$maskbits' to subnet. Resulting subnet '$subnet' is invalid."; return 1; }
+		{ echo "get-subnet: Error converting '$addr/$maskbits' to subnet. Resulting subnet '$subnet' is invalid." >&2; return 1; }
 )
 
 ### Constants
