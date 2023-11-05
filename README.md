@@ -10,7 +10,7 @@ https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
 
 The code should be POSIX-compatible (tested on dash and on bash).
 Requires _awk_, _grep_ with ERE support, _sed_ and some additional standard Unix utilities like _tr_ and _cut_.
-Only tested with GNU variants, and only on Linux.
+Only tested with GNU variants, and only on Linux (works on OpenWRT as well as on desktop Linux distributions).
 Probably should work on other Unixes but may need slight modifications.
 
 The script is not particularly fast because it's doing a lot of validation and error checking. One run takes about 0.1s (for ipv6), depending on the CPU.
