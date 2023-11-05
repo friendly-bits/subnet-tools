@@ -1,5 +1,9 @@
 # get-subnet
-Shell script that cuts an ipv4 or ipv6 address to a given length, outputs resulting subnet with mask bits
+Shell script that trims an ipv4 or ipv6 address to a given length, and outputs resulting subnet: ip with mask bits.
+
+Examples:
+- Input: _'192.168.4.112/12' inet_. Output: _'192.160.0.0/12'_
+- Input: _'2001:4567:1111:56ff::1/42' inet6_. Output: _'2001:4567:1100::/42'_
 
 This is a modified and improved version of a script found here:
 https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
