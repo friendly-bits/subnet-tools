@@ -1,5 +1,5 @@
 # get-subnet
-Shell script that trims an ipv4 or ipv6 address to a given length (expressed in CIDR mask bits), and outputs resulting subnet.
+Shell script that trims an ipv4 or ipv6 address to a given length (expressed in CIDR mask bits), and outputs the resulting subnet.
 
 Examples:
 - Input: '**192.168.4.111/12**'. Output: '**192.160.0.0/12**'
