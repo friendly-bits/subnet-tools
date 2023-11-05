@@ -275,7 +275,7 @@ maskbits_regex_ipv6='^(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])$'
 maskbits_regex_ipv4='^(3[0-2]|([1-2][0-9])|[8-9])$'
 
 
-# to test functions from external sourcing script, export the $test_get-subnet variable in that script
+# to test functions from external sourcing script, export the $test_get_subnet variable in that script
 if [ -z "$test_get_subnet" ]; then
 	main "$1" || exit 1
 else return 0
