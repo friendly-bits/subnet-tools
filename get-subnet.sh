@@ -6,15 +6,22 @@
 
 # requires ip with mask bits in 1st arg. auto-detects the ip family.
 
-# this is a modified and (hopefully) improved version of a script found here:
+# this is a modified and (hopefully) improved version of some parts of a script found here:
 # https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
 # also used some input from here:
 # https://stackoverflow.com/questions/14697403/expand-ipv6-address-in-shell-script
 
-# the script should be POSIX-compatible
+# the code is POSIX-compatible
 # requires awk, grep with ERE support, sed and some additional standard utilities like tr and cut.
 # only tested with GNU variants, and only on Linux.
 
+
+#### Initial setup
+
+me=$(basename "$0")
+
+
+#### Functions
 
 # convert hex to dec (portable version)
 hex2dec() (
@@ -148,47 +155,49 @@ mask() (
 	printf "%s" "$res"
 )
 
-# validates an ipv4 or ipv6 address, with or without mask bits
-# first performs regex validation, then runs the address through 'ip route get' command
-validate_ip () (
+# validates an ipv4 or ipv6 address
+# if 'ip route get' command is working correctly, validates the address through it
+# otherwise, falls back to regex validation
+validate_ip () {
 	addr="$1"
 	family="$2"
-
-	maskbits="$(printf "%s" "$addr" | awk -F/ '{print $2}')"
-	# chop off mask bits
-	addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
 
 	[ -z "$addr" ] && { echo "validate_ip(): Error: received an empty ip address." >&2; return 1; }
 	[ -z "$family" ] && { echo "validate_ip(): Error: received empty value for ip family." >&2; return 1; }
 
-	case "$family" in
-		inet )
-			if [ -n "$maskbits" ]; then
-				printf "%s" "$maskbits" | grep -E "${maskbits_regex_ipv4}" > /dev/null || \
-					{ echo "validate_ip(): Error: failed to validate $family mask bits '$maskbits' with 'grep -E ${maskbits_regex_ipv4}'." >&2; return 1; }
-			fi
-			printf "%s" "$addr" | grep -E "${ipv4_regex}" > /dev/null || \
-				{ echo "validate_ip(): Error: failed to validate ipv4 address: '$addr' with 'grep -E ${ipv4_regex}'." >&2; return 1; }
-		;;
-
-		inet6 )
-			if [ -n "$maskbits" ]; then
-				printf "%s" "$maskbits" | grep -E "${maskbits_regex_ipv6}" > /dev/null || \
-					{ echo "validate_ip(): Error: failed to validate $family mask bits '$maskbits' with 'grep -E ${maskbits_regex_ipv6}'." >&2; return 1; }
-			fi
-			printf "%s" "$addr" | grep -E "${ipv6_regex}" > /dev/null || \
-				{ echo "validate_ip(): Error: failed to validate ipv6 address '$addr' with 'grep -E ${ipv6_regex}'." >&2; return 1; }
-		;;
-		* ) echo "validate_ip(): Error: invalid family '$family'" >&2; return 1
-	esac
-
-	# using the 'ip route get' command to put the address through kernel's validation
-	# it normally returns 0 if the ip address is correct and it has a route, 1 if the address is invalid
-	# 2 if validation successful but for some reason it doesn't want to check the route ('permission denied')
-	ip route get "$addr" >/dev/null 2>/dev/null; rv=$?
-	[ $rv -eq 1 ] && { echo "validate_ip(): Error: failed to validate the ip '$addr' with command 'ip route get'." >&2; return 1; }
+	if [ -z "$ip_route_get_disable" ]; then
+		# using the 'ip route get' command to put the address through kernel's validation
+		# it normally returns 0 if the ip address is correct and it has a route, 1 if the address is invalid
+		# 2 if validation successful but for some reason it doesn't want to check the route ('permission denied')
+		ip route get "$addr" >/dev/null 2>/dev/null; rv=$?
+		[ $rv -eq 1 ] && { echo "validate_ip(): Error: ip address'$addr' failed kernel validation." >&2; return 1; }
+	else
+		# fall back to regex validation
+		[ -z "$addr_regex" ] && { echo "validate_ip: Error: address regex has not been specified." >&2; return 1; }
+		printf "%s" "$addr" | grep -E "$addr_regex" > /dev/null || \
+			{ echo "validate_ip(): Error: failed to validate $family address '$addr' with regex." >&2; return 1; }		
+	fi
 	return 0
-)
+}
+
+# tests whether 'ip route get' command works for ip validation
+test_ip_route_get() {
+
+	# test with a legal ip
+	ip route get "$legal_addr" >/dev/null 2>/dev/null; rv_legal=$?
+ 	# test with an illegal ip
+	ip route get "$illegal_addr" >/dev/null 2>/dev/null; rv_illegal=$?
+
+	# combine the results, assigns 0 if 'ip route get' works as expected, 1 otherwise
+	rv=$(( rv_legal || ! rv_illegal ))
+
+	if [ $rv -ne 0 ]; then
+		echo "$me: Note: command 'ip route get' is not working correctly on this machine." >&2
+		echo "$me: Disabling validation using the 'ip route get' command. Less reliable regex validation will be used instead." >&2
+		echo >&2
+		ip_route_get_disable=true
+	fi
+}
 
 
 # Main
@@ -199,49 +208,41 @@ main() (
 	rv=0
 	printf "%s" "32" | grep -E "${maskbits_regex_ipv4}" > /dev/null || rv=1
 	printf "%s" "0" | grep -E "${maskbits_regex_ipv4}" > /dev/null && rv=$((rv + 1))
-	[ "$rv" -ne 0 ] && { echo "get-subnet: Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
-
- 	# test 'ip route get'
-	ip route get "127.0.0.1" >/dev/null 2>/dev/null; rv_ipv4=$?
-	[ $rv_ipv4 -eq 1 ] && echo "get-subnet: Warning: command 'ip addr get' is not working correctly on this machine for ipv4." >&2
-	ip route get "::1" >/dev/null 2>/dev/null; rv_ipv6=$?
-	[ $rv_ipv6 -eq 1 ] && echo "get-subnet: Warning: command 'ip addr get' is not working correctly on this machine for ipv6." >&2
-
-	if [ "$rv_ipv4" -eq 1 ] && [ "$rv_ipv6" -eq 1 ]; then
-		echo "get-subnet: Error: 'ip route get' command is not present or not working as expected on this machine." >&2; return 1
-	fi
-
+	[ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
 
 	addr="$1"
 
 	# get mask bits
 	maskbits="$(printf "%s" "$addr" | awk -F/ '{print $2}')"
 
-	[ -z "$maskbits" ] && { echo "get-subnet: Error: input '$addr' has no mask bits." >&2; return 1; }
+	[ -z "$maskbits" ] && { echo "$me: Error: input '$addr' has no mask bits." >&2; return 1; }
 
 	# chop off mask bits
 	addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
-
 
 	# detect the family
 	family=""
 	printf "%s" "$addr" | grep -E "${ipv4_regex}" > /dev/null && family="inet"
 	printf "%s" "$addr" | grep -E "${ipv6_regex}" > /dev/null && family="inet6"
 
-	[ -z "$family" ] && { echo "get-subnet: Error: failed to detect the family for address '$addr'." >&2; return 1; }
+	[ -z "$family" ] && { echo "$me: Error: failed to detect the family for address '$addr'." >&2; return 1; }
 
-	[ "$family" = "inet" ] && [ "$rv_ipv4" -eq 1 ] && \
-		{ echo "get-subnet: Can't process ipv4 addresses." >&2; return 1; }
-	[ "$family" = "inet6" ] && [ "$rv_ipv6" -eq 1 ] && \
-		{ echo "get-subnet: Can't process ipv6 addresses." >&2; return 1; }
-	
+	case "$family" in
+		inet ) legal_addr="127.0.0.1"; illegal_addr="127.0.0.256"; mask_len=32; maskbits_regex="$maskbits_regex_ipv4"; addr_regex="$ipv4_regex" ;;
+		inet6 ) legal_addr="::1"; illegal_addr=":a:1"; mask_len=128; maskbits_regex="$maskbits_regex_ipv6"; addr_regex="$ipv6_regex" ;;
+			* ) echo "$me: Error: invalid family '$family'" >&2; return 1
+	esac
 
-	validate_ip "${addr}/${maskbits}" "$family" || { echo "get-subnet: Error: ip '$addr' failed validation.'" >&2; return 1; }
+	# validate mask bits
+	printf "%s" "$maskbits" | grep -E "${maskbits_regex}" > /dev/null || \
+		{ echo "validate_ip(): Error: invalid $family mask bits '$maskbits'." >&2; return 1; }
 
-	ip_bytes="$(ip_to_bytes "$addr" "$family")" || { echo "get-subnet: Error converting ip to bytes." >&2; return 1; }
-	mask_bytes="$(mask "$maskbits")" || { echo "get-subnet: Error generating mask bytes." >&2; return 1; }
+	test_ip_route_get	
 
-	[ "$family" = "inet6" ] && mask_len=128 || mask_len=32
+	validate_ip "${addr}" "$family" || { echo "$me: Error: ip '$addr' failed validation.'" >&2; return 1; }
+
+	ip_bytes="$(ip_to_bytes "$addr" "$family")" || { echo "$me: Error converting ip to bytes." >&2; return 1; }
+	mask_bytes="$(mask "$maskbits")" || { echo "$me: Error generating mask bytes." >&2; return 1; }
 
 	# perform bitwise AND on the address and the mask
 	bytes=""
@@ -255,14 +256,16 @@ main() (
 	# trim extra spaces
 	bytes="$(printf "%s" "$bytes" | awk '{$1=$1};1')"
 
-	subnet="$(format_ip "$bytes" "$family")/$maskbits"
+	new_ip="$(format_ip "$bytes" "$family")" || { echo "$me: Error: failed to format new ip from bytes '$bytes'."; return 1; }
+
+	subnet="${new_ip}/$maskbits"
 
 	# shellcheck disable=SC2015
-	validate_ip "$subnet" "$family" && { printf "%s\n" "$subnet"; return 0; } || \
-		{ echo "get-subnet: Error converting '$addr/$maskbits' to subnet. Resulting subnet '$subnet' is invalid." >&2; return 1; }
+	validate_ip "$new_ip" "$family" && { printf "%s\n" "$subnet"; return 0; } || \
+		{ echo "$me: Error converting '$addr/$maskbits' to subnet. Resulting subnet '$subnet' is invalid." >&2; return 1; }
 )
 
-### Constants
+#### Constants
 # ipv4 regex and cidr regex taken from here and modified for ERE matching:
 # https://stackoverflow.com/questions/5284147/validating-ipv4-addresses-with-regexp
 # the longer ("alternative") ipv4 regex from the top suggestion performs about 40x faster on a slow CPU with ERE grep than the shorter one
