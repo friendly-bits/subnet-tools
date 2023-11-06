@@ -216,7 +216,7 @@ test_ip_route_get() {
 	rv=$(( rv_legal || rv_legal_exp || ! rv_illegal || ! rv_illegal_exp ))
 
 	if [ $rv -ne 0 ]; then
-		echo "$me: Note: command 'ip route get' is not working correctly on this machine." >&2
+		echo "$me: Note: command 'ip route get' is not working as expected (or at all) on this device." >&2
 		echo "$me: Disabling validation using the 'ip route get' command. Less reliable regex validation will be used instead." >&2
 		echo >&2
 		ip_route_get_disable=true
