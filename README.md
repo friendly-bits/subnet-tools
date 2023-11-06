@@ -10,7 +10,7 @@ https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
 
 Requires _awk_, _grep_ with ERE support, _sed_ and some additional standard Unix utilities like _tr_ and _cut_.
 
-The code is supposedly POSIX-compliant (tested on dash and on bash) and even some effort has been made to avoid using non-POSIX options of the abovementioned utilities.
+The code is POSIX-compliant (tested on dash and on bash) and an effort has been made to avoid using non-POSIX options of the abovementioned utilities.
 However, only tested with the GNU variants, and only on Linux (works on OpenWRT as well as on desktop Linux distributions).
 Probably should work on other Unixes but may need slight modifications.
 
