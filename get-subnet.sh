@@ -17,7 +17,7 @@
 
 
 #### Initial setup
-
+export LC_ALL=C
 me=$(basename "$0")
 
 
@@ -205,12 +205,14 @@ main() (
 	# check dependencies
 
 	# test 'grep -E'
-	rv=0
-	printf "%s" "32" | grep -E "${maskbits_regex_ipv4}" > /dev/null || rv=1
-	printf "%s" "0" | grep -E "${maskbits_regex_ipv4}" > /dev/null && rv=$((rv + 1))
+	rv=0; rv1=0; rv2=0
+	printf "%s" "32" | grep -E "${maskbits_regex_ipv4}" > /dev/null; rv1=$?
+	printf "%s" "0" | grep -E "${maskbits_regex_ipv4}" > /dev/null; rv2=$?
+	rv=$((rv1 || ! rv2))
 	[ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
+	unset rv rv1 rv2
 
-	addr="$1"
+	addr="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
 
 	# get mask bits
 	maskbits="$(printf "%s" "$addr" | awk -F/ '{print $2}')"
@@ -272,7 +274,7 @@ main() (
 # ipv6 regex taken from the BanIP code and modified for ERE matching
 # https://github.com/openwrt/packages/blob/master/net/banip/files/banip-functions.sh
 ipv4_regex='^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])$'
-ipv6_regex='^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}:?$'
+ipv6_regex='^([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?$'
 maskbits_regex_ipv6='^(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])$'
 maskbits_regex_ipv4='^(3[0-2]|([1-2][0-9])|[8-9])$'
 
