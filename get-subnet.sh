@@ -239,15 +239,16 @@ main() {
 	[ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
 	unset rv rv1 rv2
 
-	addr="$(printf "%s" "$1" | tr '[:upper:]' '[:lower:]')"
+	# convert to lower case
+	input_ip="$(printf "%s" "$1" | awk '{print tolower($0)}')"
 
 	# get mask bits
-	maskbits="$(printf "%s" "$addr" | awk -F/ '{print $2}')"
+	maskbits="$(printf "%s" "$input_ip" | awk -F/ '{print $2}')"
 
-	[ -z "$maskbits" ] && { echo "$me: Error: input '$addr' has no mask bits." >&2; return 1; }
+	[ -z "$maskbits" ] && { echo "$me: Error: input '$input_ip' has no mask bits." >&2; return 1; }
 
 	# chop off mask bits
-	input_addr="$(printf "%s" "$addr" | awk -F/ '{print $1}')"
+	input_addr="$(printf "%s" "$input_ip" | awk -F/ '{print $1}')"
 
 	# detect the family
 	family=""
