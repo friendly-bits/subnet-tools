@@ -2,8 +2,8 @@
 Unix shell script which trims an ipv4 or ipv6 address to a given length (expressed in CIDR mask bits) and outputs the resulting subnet.
 
 Examples:
-- Input: '**192.168.4.111/12**'. Output: '**192.160.0.0/12**'
-- Input: '**2001:4567:1111:56ff::1/42**'. Output: '**2001:4567:1100::/42**'
+- Input: '**sh get-subnet.sh 192.168.4.111/12**'. Output: '**192.160.0.0/12**'
+- Input: '**sh get-subnet.sh 2001:4567:1111:56ff::1/42**'. Output: '**2001:4567:1100::/42**'
 
 This is a modified and (hopefully) improved version of some parts of a script found here:
 https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
