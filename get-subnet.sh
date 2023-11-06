@@ -208,7 +208,7 @@ test_ip_route_get() {
  	# test with an illegal ip
 	ip route get "$illegal_addr" >/dev/null 2>/dev/null; [ $? -ne 1 ] && rv_illegal=0
 	# test with a legal expanded ip
-	ip route get "$legal_exp_addr" >/dev/null 2>/dev/null; if [ $? -ne 0 ] && [ $? -ne 2 ]; then rv_legal_exp=1; fi
+	ip route get "$legal_exp_addr" >/dev/null 2>/dev/null; rv=$?; if [ $rv -ne 0 ] && [ $rv -ne 2 ]; then rv_legal_exp=1; fi
 	# test with an illegal expanded ip
 	ip route get "$illegal_exp_addr" >/dev/null 2>/dev/null; [ $? -ne 1 ] && rv_illegal_exp=0
 
