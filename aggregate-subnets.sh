@@ -101,12 +101,12 @@ while [ -n "$sorted_subnets_bytes" ]; do
 		IFS="$OLDIFS"
 
 		# format from bytes back to ip
-		subnet1_bytes="$(format_ip "$ip_bytes1" "$family")" || exit 1
+		subnet1="$(format_ip "$ip_bytes1" "$family")" || exit 1
 		# add current subnet to resulting list
-		if validate_ip "$subnet1_bytes"; then
+		if validate_ip "$subnet1"; then
 			# append mask bits
-			subnet1_bytes="${subnet1_bytes}/$maskbits"
-			res_subnets="${subnet1_bytes}${newline}${res_subnets}"
+			subnet1="${subnet1}/$maskbits"
+			res_subnets="${subnet1}${newline}${res_subnets}"
 		else
 			exit 1
 		fi
