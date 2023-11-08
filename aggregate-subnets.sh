@@ -19,7 +19,7 @@ script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 export source_get_subnet="true"
 
 # source the get-subnet.sh script
-. "$script_dir/get-subnet.sh" || { echo "$me: Error: Can't source '$script_dir/cut-ip.sh'." >&2; exit 1; }
+. "$script_dir/get-subnet.sh" || { echo "$me: Error: Can't source '$script_dir/get-subnet.sh'." >&2; exit 1; }
 
 # 1st arg is family
 family="$1"; shift
