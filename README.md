@@ -13,7 +13,7 @@ Examples:
 The auxiliary script _get-subnet-tests.sh_ tests some functions found in the main script. It's not required for the main script.
 
 ## aggregate-subnets.sh
-Unix shell script which aggregates multiple subnets (where aggregation is possible). Utilizes the above get-subnet.sh script as a library.
+Unix shell script which aggregates multiple subnets (where aggregation is possible). Utilizes the above get-subnet.sh script as a library. Requires to specify family (inet or inet6) as 1st argument, then any number of subnets to aggregate (for ipv6, enclose each one in double quotes).
 
 Examples:
 - Input: **`sh aggregate-subnets.sh inet 192.168.1.1/24 192.168.0.0/16 192.169.0.9/8`**.
