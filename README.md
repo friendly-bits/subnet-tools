@@ -17,14 +17,18 @@ Unix shell script which aggregates multiple subnets (where aggregation is possib
 
 Examples:
 - Input: **`sh aggregate-subnets.sh inet 192.168.1.1/24 192.168.0.0/16 192.169.0.9/8`**.
+
 Output:
 **`192.0.0.0/8`**
 
 - Input: **`sh aggregate-subnets.sh inet 192.168.1.1/24 192.168.0.0/16 192.169.0.9/16`**.
+
 Output: **`192.168.1.0/24 192.169.0.0/16`**
 
+(works the same way for ipv6 subnets)
 
-Dependencies: _awk_, _grep_ with ERE support, _sed_ and some additional standard Unix utilities like _tr_ and _cut_.
+## Dependencies
+_awk_, _grep_ with ERE support, _sed_ and some additional standard Unix utilities like _tr_ and _cut_.
 
 The code is POSIX-compliant (tested on dash and on bash) and an effort has been made to avoid using non-POSIX options of the aforementioned utilities.
 However, only tested with the GNU variants, and only on Linux (works on OpenWRT as well as on desktop Linux distributions).
