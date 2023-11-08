@@ -34,6 +34,7 @@ The code is POSIX-compliant (tested on dash and on bash) and an effort has been 
 However, only tested with the GNU variants, and only on Linux (works on OpenWRT as well as on desktop Linux distributions).
 Probably should work on other Unixes but may need slight modifications.
 
+## Notes
 The scripts are not particularly fast because they're doing a lot of validation and error checking.
 If you want to process a lot of addresses, the validation code can be removed and that should speed them up somewhat.
 
