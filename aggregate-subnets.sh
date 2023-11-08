@@ -2,6 +2,13 @@
 
 # aggregate-subnets.sh
 
+# Posix-compliant shell script which calculates merged subnets (where merge is possible).
+# Basically the script attempts to calculate an efficient configuration for subnets given as an input 
+# by trimming down each input subnet to its mask bits and removing subnets that are encapsulated inside other subnets on the list.
+# Designed for easier automated creation of firewall rules, but perhaps someone has a different application for this functionality.
+# Utilizes the get-subnet.sh script as a library.
+
+
 # arg 1 is family (inet or inet6)
 # next args are subnets to aggregate, each enclosed in double quotes
 
@@ -10,7 +17,6 @@
 export LC_ALL=C
 me=$(basename "$0")
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
-# shellcheck disable=SC2015
 export source_get_subnet="true"
 
 # source the get-subnet.sh script
@@ -54,7 +60,6 @@ newline='
 '
 OLDIFS="$IFS"
 
-# shellcheck disable=SC2034
 while [ -n "$sorted_subnets_bytes" ]; do
 	# grab the 1st subnet
 	subnet1_bytes="$(printf "%s\n" "$sorted_subnets_bytes" | head -n 1)"
