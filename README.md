@@ -23,7 +23,7 @@ Output:
 
 - Input: **`sh aggregate-subnets.sh inet 192.168.1.1/24 192.168.0.0/16 192.169.0.9/16`**.
 
-Output: **`192.168.1.0/24 192.169.0.0/16`**
+Output: **`192.168.0.0/16 192.169.0.0/16`**
 
 (works the same way for ipv6 subnets)
 
