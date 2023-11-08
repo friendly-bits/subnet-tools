@@ -10,7 +10,7 @@ script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 # shellcheck disable=SC2015
 
 export source_get_subnet="true"
-. "$script_dir/get-subnet.sh" || { echo "$me: Error: Can't source '$script_dir/cut-ip.sh'." >&2; exit 1; }
+. "$script_dir/get-subnet.sh" || { echo "$me: Error: Can't source '$script_dir/get-subnet.sh'." >&2; exit 1; }
 
 test_exp_comp_ipv6(){
 
