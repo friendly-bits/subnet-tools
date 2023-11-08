@@ -30,29 +30,34 @@ hex2dec() (
 	[ -z "$hex" ] && { echo "hex2dec(): Error: received an empty value." >&2; return 1; }
 
 	for i in $hex; do
-		printf "%d " "$(( 0x$i ))"
+		dec="$dec $(printf "%d" "$(( 0x$i ))")"
 	done
+
+	# trim leading whitespace
+	dec="${dec#?}"
+	printf "%s" "$dec"
 )
 
 # converts given ip address into 1-byte chunks
 ip_to_bytes() (
 	ip="$1"
 	family="$2"
-
-	[ -z "$addr" ] && { echo "ip_to_bytes(): Error: received an empty ip address." >&2; return 1; }
+	[ -z "$ip" ] && { echo "ip_to_bytes(): Error: received an empty ip address." >&2; return 1; }
 	[ -z "$family" ] && { echo "ip_to_bytes(): Error: received an empty value for ip family." >&2; return 1; }
 
 	case "$family" in
 		inet )	printf "%s" "$ip" | tr '.' ' ' ;;
 		inet6 )
 			expanded_ip="$(expand_ipv6 "$ip")"
-			validate_ip "$expanded_ip" "$family" || \
+			validate_ip "$expanded_ip" || \
 				{ echo "ip_to_bytes(): Error: failed to expand ip '$ip'. Resulting address '$expanded_ip' is invalid." >&2; return 1; }
+			# split into whitespace-separated bytes
 			split_exp_ip="$(printf "%s" "$expanded_ip" | tr -d ':' | sed 's/.\{2\}/& /g')"
-			# expanded ip should be represented in exactly 16 bytes
+			# remove trailing whitespace
+			split_exp_ip="${split_exp_ip%?}"
+			# expanded ipv6 address should be represented in exactly 16 bytes
 			[ "$(printf "%s" "$split_exp_ip" | wc -w)" -ne 16 ] && \
 				{ echo "ip_to_bytes(): Error: failed to expand ip '$ip'. Resulting address '$expanded_ip' has invalid length." >&2; return 1; }
-
 			hex2dec "$split_exp_ip" ;;
 		* ) echo "ip_to_bytes(): Error: invalid family '$family'" >&2; return 1 ;;
 	esac
@@ -113,7 +118,7 @@ compress_ipv6 () (
 		esac
 	done
 
-	# strip leading colon if it's not a double colon
+	# trim leading colon if it's not a double colon
 	case "$compress_var" in
 		::*) ;;
 		:*) compress_var="${compress_var#:}"
@@ -139,7 +144,7 @@ format_ip() (
 			# shellcheck disable=SC2086
 			addr="$(printf "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x\n" $bytes)"
 			addr_compressed="$(compress_ipv6 "$addr")" || return 1
-			validate_ip "$addr" "$family" || \
+			validate_ip "$addr" || \
 				{ echo "format_ip(): Error: Failed to compress address '$addr', resulting ip '$addr_compressed' is invalid.'" >&2; return 1; }
 			printf "%s" "$addr_compressed"
 			return 0
@@ -167,8 +172,8 @@ generate_mask() (
 		res="$res $b"
 	done
 
-	# trim extra spaces
-	res="$(printf "%s" "$res" | awk '{$1=$1};1')"
+	# trim leading whitespace
+	res="${res#?}"
 	printf "%s" "$res"
 )
 
@@ -177,10 +182,7 @@ generate_mask() (
 # otherwise, falls back to regex validation
 validate_ip () {
 	addr="$1"
-	family="$2"
-
 	[ -z "$addr" ] && { echo "validate_ip(): Error: received an empty ip address." >&2; return 1; }
-	[ -z "$family" ] && { echo "validate_ip(): Error: received empty value for ip family." >&2; return 1; }
 
 	if [ -z "$ip_route_get_disable" ]; then
 		# using the 'ip route get' command to put the address through kernel's validation
@@ -191,8 +193,8 @@ validate_ip () {
 	else
 		# fall back to regex validation
 		[ -z "$addr_regex" ] && { echo "validate_ip: Error: address regex has not been specified." >&2; return 1; }
-		printf "%s" "$addr" | grep -E "$addr_regex" > /dev/null || \
-			{ echo "validate_ip(): Error: failed to validate $family address '$addr' with regex." >&2; return 1; }		
+		printf "%s" "$addr" | grep -E "^$addr_regex$" > /dev/null || \
+			{ echo "validate_ip(): Error: failed to validate address '$addr' with regex." >&2; return 1; }
 	fi
 	return 0
 }
@@ -225,7 +227,7 @@ test_ip_route_get() {
 
 
 # Main
-main() {
+get_subnet() {
 	# check dependencies
 	! command -v awk >/dev/null || ! command -v sed >/dev/null || ! command -v tr >/dev/null || ! command -v grep >/dev/null || \
 		! command -v wc >/dev/null || ! command -v ip >/dev/null || ! command -v cut >/dev/null && \
@@ -252,27 +254,25 @@ main() {
 
 	# detect the family
 	family=""
-	printf "%s" "$input_addr" | grep -E "${ipv4_regex}" > /dev/null && family="inet"
-	printf "%s" "$input_addr" | grep -E "${ipv6_regex}" > /dev/null && family="inet6"
+	printf "%s" "$input_addr" | grep -E "^${ipv4_regex}$" > /dev/null && family="inet"
+	printf "%s" "$input_addr" | grep -E "^${ipv6_regex}$" > /dev/null && family="inet6"
 
 	[ -z "$family" ] && { echo "$me: Error: failed to detect the family for address '$input_addr'." >&2; return 1; }
 
 	case "$family" in
-		inet ) legal_addr="127.0.0.1"; illegal_addr="127.0.0.256"; mask_len=32; maskbits_regex="$maskbits_regex_ipv4"; addr_regex="$ipv4_regex" ;;
-		inet6 ) legal_addr="::1"; illegal_addr=":a:1"; mask_len=128; maskbits_regex="$maskbits_regex_ipv6"; addr_regex="$ipv6_regex" ;;
+		inet ) legal_addr="127.0.0.1"; illegal_addr="127.0.0.256"; mask_len=32; addr_regex="$ipv4_regex" ;;
+		inet6 ) legal_addr="::1"; illegal_addr=":a:1"; mask_len=128; addr_regex="$ipv6_regex" ;;
 	esac
 
 	# validate mask bits
-	printf "%s" "$maskbits" | grep -E "${maskbits_regex}" > /dev/null || \
-		{ echo "$me: Error: invalid $family mask bits '$maskbits'." >&2; return 1; }
+	if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $mask_len ]; then echo "$me: Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
 
 	test_ip_route_get	
 
-	validate_ip "${input_addr}" "$family" || return 1
+	validate_ip "${input_addr}" || return 1
 
 	ip_bytes="$(ip_to_bytes "$input_addr" "$family")" || return 1
 	mask_bytes="$(generate_mask "$maskbits")" || return 1
-
 	# perform bitwise AND on the address and the mask
 	bytes=""
 	for i in $(seq 1 $(( mask_len/8 )) ); do
@@ -282,15 +282,15 @@ main() {
 		bytes="$bytes $b"
 	done
 
-	# trim extra spaces
-	bytes="$(printf "%s" "$bytes" | awk '{$1=$1};1')"
+	# trim leading whitespace
+	bytes="${bytes#?}"
 
 	new_ip="$(format_ip "$bytes" "$family")" || return 1
 
 	subnet="${new_ip}/$maskbits"
 
 	# shellcheck disable=SC2015
-	validate_ip "$new_ip" "$family" && { printf "%s\n" "$subnet"; return 0; } || return 1
+	validate_ip "$new_ip" && { printf "%s\n" "$subnet"; return 0; } || return 1
 }
 
 #### Constants
@@ -299,14 +299,14 @@ main() {
 # the longer ("alternative") ipv4 regex from the top suggestion performs about 40x faster on a slow CPU with ERE grep than the shorter one
 # ipv6 regex taken from the BanIP code and modified for ERE matching
 # https://github.com/openwrt/packages/blob/master/net/banip/files/banip-functions.sh
-ipv4_regex='^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])$'
-ipv6_regex='^([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?$'
-maskbits_regex_ipv6='^(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])$'
-maskbits_regex_ipv4='^(3[0-2]|([1-2][0-9])|[8-9])$'
+ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
+ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
+maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
+#maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
 
 
-# to test functions from external sourcing script, export the $test_get_subnet variable in that script
-if [ -z "$test_get_subnet" ]; then
-	main "$1" || exit 1
+# to test functions from external sourcing script, export the $source_get_subnet variable in that script
+if [ -z "$source_get_subnet" ]; then
+	get_subnet "$1" || exit 1
 else return 0
 fi
