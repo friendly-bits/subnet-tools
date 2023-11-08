@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC2181
+# shellcheck disable=SC2181,SC2031,SC2030
 
 # get-subnet.sh
 
@@ -24,49 +24,36 @@ me=$(basename "$0")
 
 #### Functions
 
-# convert hex to dec (portable version)
-hex2dec() (
-	hex="$*"
-	[ -z "$hex" ] && { echo "hex2dec(): Error: received an empty value." >&2; return 1; }
-
-	for i in $hex; do
-		dec="$dec $(printf "%d" "$(( 0x$i ))")"
-	done
-
-	# trim leading whitespace
-	dec="${dec#?}"
-	printf "%s" "$dec"
-)
-
-# converts given ip address into 1-byte chunks
-ip_to_bytes() (
+# converts given ip address into hex chunks
+ip_to_hex() (
 	ip="$1"
 	family="$2"
-	[ -z "$ip" ] && { echo "ip_to_bytes(): Error: received an empty ip address." >&2; return 1; }
-	[ -z "$family" ] && { echo "ip_to_bytes(): Error: received an empty value for ip family." >&2; return 1; }
+	[ -z "$ip" ] && { echo "ip_to_hex(): Error: received an empty ip address." >&2; return 1; }
+	[ -z "$family" ] && { echo "ip_to_hex(): Error: received an empty value for ip family." >&2; return 1; }
 
 	case "$family" in
-		inet )	printf "%s" "$ip" | tr '.' ' ' ;;
+		inet )
+			split_ip="$(printf "%s" "$ip" | tr '.' ' ')"
+			for ip in $split_ip; do
+				printf "%02x" "$ip"
+			done
+		;;
 		inet6 )
 			expanded_ip="$(expand_ipv6 "$ip")"
-			validate_ip "$expanded_ip" || \
-				{ echo "ip_to_bytes(): Error: failed to expand ip '$ip'. Resulting address '$expanded_ip' is invalid." >&2; return 1; }
-			# split into whitespace-separated bytes
-			split_exp_ip="$(printf "%s" "$expanded_ip" | tr -d ':' | sed 's/.\{2\}/& /g')"
-			# remove trailing whitespace
-			split_exp_ip="${split_exp_ip%?}"
-			# expanded ipv6 address should be represented in exactly 16 bytes
-			[ "$(printf "%s" "$split_exp_ip" | wc -w)" -ne 16 ] && \
-				{ echo "ip_to_bytes(): Error: failed to expand ip '$ip'. Resulting address '$expanded_ip' has invalid length." >&2; return 1; }
-			hex2dec "$split_exp_ip" ;;
-		* ) echo "ip_to_bytes(): Error: invalid family '$family'" >&2; return 1 ;;
+			# split into whitespace-separated chunks
+			split_exp_ip="$(printf "%s" "$expanded_ip" | sed 's/.\{8\}/& /g;s/[ ]$//')"
+			# expanded ipv6 address should be represented in 4 chunks
+			[ "$(printf "%s" "$split_exp_ip" | wc -w)" -ne 4 ] && \
+				{ echo "ip_to_hex(): Error: failed to expand ip '$ip'. Resulting address '$expanded_ip' has invalid length." >&2; return 1; }
+			printf "%s" "$split_exp_ip"
+		;;
+		* ) echo "ip_to_hex(): Error: invalid family '$family'" >&2; return 1 ;;
 	esac
 )
 
-# expands given ipv6 address
+# expands given ipv6 address into continuous hex number
 expand_ipv6() (
 	addr="$1"
-
 	[ -z "$addr" ] && { echo "expand_ipv6(): Error: received an empty ip address." >&2; return 1; }
 
 	# prepend 0 if we start with :
@@ -74,91 +61,97 @@ expand_ipv6() (
 
 	# expand ::
 	if printf "%s" "$addr" | grep "::" >/dev/null 2>/dev/null; then
-		colons=$(printf "%s" "$addr" | sed 's/[^:]//g')
-		missing=$(printf "%s" ":::::::::" | sed "s/$colons//")
-		expanded=$(printf "%s" "$missing" | sed 's/:/:0/g')
-		addr=$(printf "%s" "$addr" | sed "s/::/$expanded/")
+		# count missing colons
+		missing_colons=$(( (9 - $(printf "%s" "$addr" | tr -cd ':' | wc -c) )*2 ))
+		# repeat :0 for every missing colon
+		expanded_zeroes="$(yes :0 | tr -d '\n' | head -c "$missing_colons")"
+		# replace '::'
+		addr=$(printf "%s" "$addr" | sed "s/::/$expanded_zeroes/")
 	fi
-	blocks=$(printf "%s" "$addr" | tr ':' ' ')
-	blocks="$(hex2dec "$blocks")"
-	for block in $blocks; do
-		blocks_temp="$blocks_temp$(printf "%04x:" "$block")"
+
+	# replace colons with whitespaces
+	quads=$(printf "%s" "$addr" | tr ':' ' ')
+
+	# pad with 0's and merge
+	for quad in $quads; do
+		printf "%04x" "0x${quad}"
 	done
-	# trim trailing ':'
-	blocks="${blocks_temp%?}"
-	printf "%s" "$blocks"
 )
 
 # returns a compressed ipv6 address in the format recommended by RFC5952
-# expects a fully expanded ipv6 address as input
+# expects a fully expanded and merged ipv6 address as input (no colons)
 compress_ipv6 () (
-	addr="$1"
-	[ -z "$addr" ] && { echo "compress_ipv6(): Error: received an empty ip address." >&2; return 1; }
+	# add leading colon
+	quads_merged="${1}"
+	[ -z "$quads_merged" ] && { echo "compress_ipv6(): Error: received an empty string." >&2; return 1; }
 
-	# split into chunks
-	chunks="$(printf "%s" "$addr" | tr ':' '\n')"
+	# split into whitespace-separated quads
+	quads="$(printf "%s" "$quads_merged" | sed 's/.\{4\}/& /g')"
+	# remove extra leading 0's in each quad, remove whitespaces, add colons
+	for quad in $quads; do
+		ip="${ip}$(printf "%x:" 0x"${quad}")"
+	done
 
-	# convert each chunk into hex and back, in order to compress 0's inside each chunk
-	compress_var="$(printf "%s\n" "$chunks" | \
-		while read -r chunk; do
-			# each chunk in expanded ip should be represented in exactly 4 characters
-			[ ${#chunk} -ne 4 ] && { echo "compress_ipv6(): Error: chunk '$chunk' of input ip '$addr' has invalid length." >&2; return 1; }
-			printf ":%x" "$((0x$chunk))"
-		done
-	)"
-	[ $? -ne 0 ] && return 1
+	# remove trailing colon, add leading colon
+	ip=":${ip%?}"
 
 	# compress 0's across neighbor chunks
 	for zero_chain in ":0:0:0:0:0:0:0:0" ":0:0:0:0:0:0:0" ":0:0:0:0:0:0" ":0:0:0:0:0" ":0:0:0:0" ":0:0:0" ":0:0"
 	do
-		case "$compress_var" in
+		case "$ip" in
 			*$zero_chain* )
-				compress_var="$(printf "%s" "$compress_var" | sed -e "s/$zero_chain/::/" -e 's/:::/::/')"
+				ip="$(printf "%s" "$ip" | sed -e "s/$zero_chain/::/" -e 's/:::/::/')"
 				break
 		esac
 	done
 
 	# trim leading colon if it's not a double colon
-	case "$compress_var" in
+	case "$ip" in
 		::*) ;;
-		:*) compress_var="${compress_var#:}"
+		:*) ip="${ip#:}"
 	esac
-	printf "%s" "$compress_var"
+	printf "%s" "$ip"
 )
 
-# formats the input bytes as an ipv4 or ipv6 address
+# formats merged hex number as an ipv4 or ipv6 address
 format_ip() (
-	bytes="$1"
+	ip_hex_merged="$1"
 	family="$2"
 
-	[ -z "$bytes" ] && { echo "format_ip(): Error: received empty value instead of bytes." >&2; return 1; }
+	[ -z "$ip_hex_merged" ] && { echo "format_ip(): Error: received empty value instead of ip_hex_merged." >&2; return 1; }
 	[ -z "$family" ] && { echo "format_ip(): Error: received empty value for ip family." >&2; return 1; }
-
 	case "$family" in
 		inet )
-			# shellcheck disable=SC2086
-			printf "%d.%d.%d.%d\n" $bytes
+			# split into 4 octets
+			octets="$(printf "%s" "$ip_hex_merged" | sed 's/.\{2\}/& /g')"
+			# convert from hex to dec, remove spaces, add delimiting '.'
+			for octet in $octets; do
+				ip="${ip}$(printf "%d." 0x"${octet}")"
+			done
+			# remove trailing '.'
+			ip="${ip%?}"
+			printf "%s" "$ip"
 			return 0
 		;;
 		inet6 )
-			# shellcheck disable=SC2086
-			addr="$(printf "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x\n" $bytes)"
-			addr_compressed="$(compress_ipv6 "$addr")" || return 1
-			validate_ip "$addr" || \
-				{ echo "format_ip(): Error: Failed to compress address '$addr', resulting ip '$addr_compressed' is invalid.'" >&2; return 1; }
-			printf "%s" "$addr_compressed"
+			# convert from expanded and merged number into compressed colon-delimited ip
+			ip="$(compress_ipv6 "$ip_hex_merged")" || return 1
+			validate_ip "$ip" || \
+				{ echo "format_ip(): Error: Failed to convert and compress address '$ip_hex_merged', resulting ip '$ip' is invalid.'" >&2; return 1; }
+			printf "%s" "$ip"
 			return 0
 		;;
 		* ) echo "format_ip(): Error: invalid family '$family'" >&2; return 1
 	esac
 )
 
-# generates a mask represented as 16 1-byte hex chunks
+# generates a mask represented as 4 4-bytes-long hex chunks
 generate_mask() (
 	maskbits="$1"
+
 	[ -z "$maskbits" ] && { echo "generate_mask(): Error: received empty value instead of mask bits." >&2; return 1; }
 
-	res=""
+	merged_mask=""
 	for i in $(seq 0 15); do
 		b=0
 		j=$(( maskbits - 8 * i))
@@ -169,12 +162,11 @@ generate_mask() (
 		else
 			b=0
 		fi
-		res="$res $b"
+		# convert to hex and merge
+		merged_mask="${merged_mask}$(printf '%02x' "$b")"
 	done
-
-	# trim leading whitespace
-	res="${res#?}"
-	printf "%s" "$res"
+	# split into 4-bytes long whitespace-separated chunks
+	printf "%s" "$merged_mask" | sed 's/.\{8\}/& /g;s/[ ]$//'
 )
 
 # validates an ipv4 or ipv6 address
@@ -271,21 +263,18 @@ get_subnet() {
 
 	validate_ip "${input_addr}" || return 1
 
-	ip_bytes="$(ip_to_bytes "$input_addr" "$family")" || return 1
-	mask_bytes="$(generate_mask "$maskbits")" || return 1
+	# convert to 4-bytes long hex chunks
+	ip_chunks="$(ip_to_hex "$input_addr" "$family")" || return 1
+	mask_chunks="$(generate_mask "$maskbits")" || return 1
 	# perform bitwise AND on the address and the mask
-	bytes=""
-	for i in $(seq 1 $(( mask_len/8 )) ); do
-		mask_byte="$(printf "%s" "$mask_bytes" | cut -d' ' -f "$i")"
-		ip_byte="$(printf "%s" "$ip_bytes" | cut -d' ' -f "$i")"
-		b=$(( ip_byte & mask_byte ))
-		bytes="$bytes $b"
+	newip_hex=""
+	for i in $(seq 1 $(( mask_len/32 )) ); do
+		mask_chunk="$(printf "%s" "$mask_chunks" | cut -d' ' -f "$i")"
+		ip_chunk="$(printf "%s" "$ip_chunks" | cut -d' ' -f "$i")"
+		b=$(printf "%08x" $(( 0x$ip_chunk & 0x$mask_chunk )) )
+		newip_hex="${newip_hex}${b}"
 	done
-
-	# trim leading whitespace
-	bytes="${bytes#?}"
-
-	new_ip="$(format_ip "$bytes" "$family")" || return 1
+	new_ip="$(format_ip "$newip_hex" "$family")" || return 1
 
 	subnet="${new_ip}/$maskbits"
 
