@@ -47,8 +47,8 @@ for in_subnet in $input_subnets; do
 	subnets_bytes="$(printf "%s/%s\n%s\n" "${maskbits}" "${subnet_bytes}" "$subnets_bytes")"
 done
 
-# sort by mask bits
-sorted_subnets_bytes="$(printf "%s\n" "$subnets_bytes" | sort -un)"
+# remove duplicates, then sort by mask bits
+sorted_subnets_bytes="$(printf "%s\n" "$subnets_bytes" | sort -u | sort -n)"
 
 newline='
 '
