@@ -9,7 +9,7 @@
 
 
 # arg 1 is family (inet or inet6)
-# next args are subnets to aggregate, each enclosed in double quotes
+# next args are subnets to aggregate. for ipv6, enclose each subnet in double quotes
 
 #### Initial setup
 
