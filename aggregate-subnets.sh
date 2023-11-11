@@ -117,7 +117,7 @@ while [ -n "$sorted_subnets_hex" ]; do
 		mask_chunk="$(printf "%s" "$mask_chunks" | cut -d' ' -f "$i")"
 		ip_chunk="$(printf "%s" "$ip_chunks" | cut -d' ' -f "$i")"
 		ip_chunk="$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) )" || \
-			{ echo "$me: Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; exit 1; }
+			{ echo "$me: Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'." >&2; exit 1; }
 		ip1="$ip1$(printf "%s" "${ip_chunk}")"
 		ip1_chunks="$ip1_chunks $(printf "%s" "${ip_chunk}")"
 		bits_processed=$((bits_processed + chunk_len))
@@ -156,20 +156,20 @@ while [ -n "$sorted_subnets_hex" ]; do
 
 			for i in $(seq 1 $(( mask_len / chunk_len )) ); do
 				ip1_chunk="$(printf "%s" "$ip1_chunks" | cut -d' ' -f "$i")"
-				[ "$debug" ] && echo "ip1_chunk: '$ip1_chunk'"
+				[ "$debug" ] && echo "ip1_chunk: '$ip1_chunk'" >&2
 
 				# perform bitwise AND on the 2nd address and the mask of 1st address
 				mask_chunk="$(printf "%s" "$mask_chunks" | cut -d' ' -f "$i")"
 				ip2_chunk="$(printf "%s" "$ip2_chunks" | cut -d' ' -f "$i")"
 				# bitwise AND on a chunk of subnet2 and corresponding chunk of mask from subnet1
 				ip2_chunk=$(printf "%0${char_num}x" $(( 0x$ip2_chunk & 0x$mask_chunk )) ) || \
-							{ echo "$me: Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'."; exit 1; }
-				[ "$debug" ] && echo "mask_chunk: '$mask_chunk', ip2_chunk: '$ip2_chunk'"
+							{ echo "$me: Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'." >&2; exit 1; }
+				[ "$debug" ] && echo "mask_chunk: '$mask_chunk', ip2_chunk: '$ip2_chunk'" >&2
 
 				# check for difference between current chunk in subnet1 and subnet2
 
 				bytes_diff=$((0x$ip1_chunk - 0x$ip2_chunk)) || \
-							{ echo "$me: Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'."; exit 1; }
+							{ echo "$me: Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'." >&2; exit 1; }
 				# if there is any difference, no need to calculate further
 				if [ $bytes_diff -ne 0 ]; then
 					[ "$debug" ] && echo "difference found" >&2
