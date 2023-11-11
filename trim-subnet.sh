@@ -74,7 +74,7 @@ expand_ipv6() (
 	# pad with 0's and merge
 	for quad in $quads; do
 		printf "%04x" "0x$quad" || \
-					{ echo "expand_ipv6(): Error: failed to convert quad '0x$quad'."; return 1; }
+					{ echo "expand_ipv6(): Error: failed to convert quad '0x$quad'." >&2; return 1; }
 	done
 )
 
@@ -90,7 +90,7 @@ compress_ipv6 () (
 	# remove extra leading 0's in each quad, remove whitespaces, add colons
 	for quad in $quads; do
 		ip="${ip}$(printf "%x:" "0x$quad")" || \
-					{ echo "compress_ipv6(): Error: failed to convert quad '0x$quad'."; return 1; }
+					{ echo "compress_ipv6(): Error: failed to convert quad '0x$quad'." >&2; return 1; }
 	done
 
 	# remove trailing colon, add leading colon
