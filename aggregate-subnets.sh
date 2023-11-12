@@ -87,7 +87,7 @@ for subnet in $input_subnets; do
 done
 
 # remove duplicates, sort by mask bits, remove empty lines if any
-sorted_subnets_hex="$(printf "%s\n" "$subnets_hex" | sort -u | sort -n | awk -F_ '$1{print $1}')"
+sorted_subnets_hex="$(printf "%s\n" "$subnets_hex" | sort -n | awk -F_ '$1{print $1}')"
 
 while [ -n "$sorted_subnets_hex" ]; do
 	## trim the 1st (largest) subnet on the list to its mask bits
@@ -173,7 +173,7 @@ while [ -n "$sorted_subnets_hex" ]; do
 				# if there is any difference, no need to calculate further
 				if [ $bytes_diff -ne 0 ]; then
 					[ "$debug" ] && echo "difference found" >&2
-					ip2_differs=true
+					ip2_differs=true; break
 				fi
 
 				bits_processed=$((bits_processed + chunk_len))
