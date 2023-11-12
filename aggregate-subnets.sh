@@ -33,8 +33,8 @@ family="$(printf "%s" "$1" | awk '{print tolower($0)}')"; shift
 
 # test 'grep -E'
 rv=0; rv1=0; rv2=0
-printf "%s" "32" | grep -E "${maskbits_regex_ipv4}" > /dev/null; rv1=$?
-printf "%s" "0" | grep -E "${maskbits_regex_ipv4}" > /dev/null; rv2=$?
+printf "%s" "32" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv1=$?
+printf "%s" "0" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv2=$?
 rv=$((rv1 || ! rv2))
 [ "$rv" -ne 0 ] && { echo "get_subnet(): Error: 'grep -E' command is not working correctly on this machine." >&2; exit 1; }
 unset rv rv1 rv2
