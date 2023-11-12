@@ -1,9 +1,10 @@
 #!/bin/sh
+# shellcheck disable=SC2034,SC2154
 
 # tests expand_ipv6(), compress_ipv6() and validate_ip()
 
 #### Initial setup
-
+export LC_ALL=C
 me=$(basename "$0")
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
@@ -75,8 +76,10 @@ fd0e21465cf545600000000000000001 fd0e:2146:5cf5:4560::1
 
 	return $((status_exp + status_comp))
 }
-status=$?
+
+addr_regex="$ipv6_regex"
 test_exp_comp_ipv6
+status=$?
 echo
 echo "Tests done: $tests_done"
 echo "Test status: $status"
