@@ -168,7 +168,7 @@ generate_mask() (
 
 # validates an ipv4 or ipv6 address
 # if 'ip route get' command is working correctly, validates the address through it
-# otherwise, falls back to regex validation
+# then performs regex validation
 validate_ip () (
 	addr="$1"
 	[ -z "$addr" ] && { echo "validate_ip(): Error:- received an empty ip address." >&2; return 1; }
@@ -267,8 +267,8 @@ trim_subnet() {
 
 	# test 'grep -E'
 	rv=0; rv1=0; rv2=0
-	printf "%s" "32" | grep -E "${maskbits_regex_ipv4}" > /dev/null; rv1=$?
-	printf "%s" "0" | grep -E "${maskbits_regex_ipv4}" > /dev/null; rv2=$?
+	printf "%s" "32" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv1=$?
+	printf "%s" "0" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv2=$?
 	rv=$((rv1 || ! rv2))
 	[ "$rv" -ne 0 ] && { echo "trim_subnet(): Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
 	unset rv rv1 rv2
