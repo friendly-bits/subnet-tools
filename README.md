@@ -35,7 +35,4 @@ However, only tested with the GNU variants, and only on Linux (works on OpenWRT 
 Probably should work on other Unixes but may need slight modifications.
 
 ## Notes
-The scripts are not particularly fast because they're doing a lot of validation and error checking.
-If you want to process a lot of addresses, the validation code can be removed and that should speed them up somewhat.
-
 If you find any bugs or have a suggestion for code improvement, please let me know.
