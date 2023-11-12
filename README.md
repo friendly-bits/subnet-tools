@@ -36,9 +36,9 @@ Requires the aggregate-subnets.sh script to process found ip addresses.
 
 Options:
 
-'-s': only output aggregated subnets
+`-s`: only output aggregated subnets
 
-'-f <family>': only check subnets for specified family (inet or inet6)
+`-f <family>`: only check subnets for specified family (inet or inet6)
 
 ## Dependencies
 **_awk_**, **_grep_** with ERE support, **_sed_** and some additional standard Unix utilities like **_tr_**, **_sort_** and **_cut_**.
