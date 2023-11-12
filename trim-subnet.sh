@@ -25,7 +25,7 @@ me=$(basename "$0")
 
 #### Functions
 
-# converts given ip address into hex chunks
+# converts given ip address into hex number
 ip_to_hex() (
 	ip="$1"
 	family="$2"
@@ -50,7 +50,7 @@ ip_to_hex() (
 	esac
 )
 
-# expands given ipv6 address into continuous hex number
+# expands given ipv6 address into hex number
 expand_ipv6() (
 	addr="$1"
 	[ -z "$addr" ] && { echo "expand_ipv6(): Error: received an empty ip address." >&2; return 1; }
