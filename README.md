@@ -32,7 +32,7 @@ Unix shell script which uses standard utilities to detect local area ipv4 and ip
 Some heuristics are employed which are likely to work on Linux but for other Unixes, testing is recommended.
 Tested on Debian-based Linux distributions and on OpenWRT.
 
-Requires the aggregate-subnets.sh script to process found ip addresses.
+Requires the aggregate-subnets.sh and the trim-subnet.sh scripts to process found ip addresses.
 
 Options:
 
