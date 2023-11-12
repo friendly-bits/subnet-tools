@@ -8,10 +8,8 @@
 # Designed for easier automated creation of firewall rules, but perhaps someone has a different application for this functionality.
 # Utilizes the trim-subnet.sh script as a library.
 
-
 # arg 1 is family (inet or inet6)
 # next args are subnets to aggregate. for ipv6, enclose each subnet in double quotes
-
 
 #### Initial setup
 
@@ -204,6 +202,4 @@ while [ -n "$sorted_subnets_hex" ]; do
 	fi
 done
 
-
-echo "Aggregated subnets:" >&2
 printf "%s\n" "$res_subnets"
