@@ -1,13 +1,31 @@
 #!/bin/sh
 
+# find-lan-subnets.sh
+
 # Unix shell script which uses standard utilities to detect local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host)
 # Some heuristics are employed which are likely to work on Linux but for other Unixes, testing is recommended
 # Requires the trim-subnet.sh script to process found ip addresses
 
-# find-lan-subnets.sh
+# by default, outputs all found local ip addresses, and aggregated subnets
+# to output only aggregated subnets (and no other text), run with the '-s' argument
+# to only check a specific family (inet or inet6), run with the '-f <family>' argument
 
 export LC_ALL=C
 
+## Simple args parsing
+args=""
+for arg in "$@"; do
+	if [ "$arg" = "-s" ]; then subnets_only="true"
+	elif [ "$arg" = "-f" ]; then family_arg="check"
+	elif [ "$family_arg" = "check" ]; then family_arg="$arg"
+	else args="$args $arg"
+	fi
+done
+
+set -- "$args"
+
+
+## Functions
 
 get_local_subnets() (
 # attempts to find local subnets, requires family in 1st arg
@@ -36,26 +54,35 @@ get_local_subnets() (
 			# 1st grep filters for ULA (unique local addresses with prefix 'fdxx')
 			# 2nd grep validates found string as ipv6 address with mask bits
 			local_addresses="$(ip -o -f inet6 addr show | awk '{for(i=1; i<=NF; i++) if($i~/^inet6$/) print $(i+1)}' | \
-				grep -E -i '^fd[0-9a-f]{0,2}:' | grep -E -i "^$subnet_regex_ipv6$")"
+				grep -E -i '^fd[0-9a-f]{0,2}:|^fe80:' | grep -E -i "^$subnet_regex_ipv6$")"
 		;;
-		* ) echo "get_local_subnets: invalid family '$family'." >&2; return 1 ;;
+		* ) echo "get_local_subnets(): invalid family '$family'." >&2; return 1 ;;
 	esac
 
-	for local_address in $local_addresses; do
-		# uses external trim-subnet.sh script to trim the subnets to mask bits
-		local_subnets="$(sh trim-subnet.sh "$local_address") $local_subnets"
-	done
+	[ -z "$subnets_only" ] && {
+		echo "Local $family addresses:"
+		echo "$local_addresses"
+		echo
+	}
 
-	# adds link-local subnet fe80::/10
-	[ "$family" = "inet6" ] && local_subnets="$local_subnets fe80::/10"
+	local_subnets="$(sh aggregate-subnets.sh "$family" "$local_addresses")"; rv1=$?
 
-	# removes extra whitespaces, converts to newline-delimited list and removes duplicates
-	local_subnets="$(printf "%s" "$local_subnets" | awk '{$1=$1};1' | tr ' ' '\n' | sort -u )"
+	# removes extra whitespaces, converts to newline-delimited list
+	local_subnets="$(printf "%s" "$local_subnets" | awk '{$1=$1};1' | tr ' ' '\n')"
 
-	[ -n "$local_subnets" ] && { printf "%s" "$local_subnets"; return 0; } || return 1
+	if [ $rv1 -eq 0 ]; then
+		[ -z "$subnets_only" ] && echo "Local $family subnets (aggregated):"
+		if [ -n "$local_subnets" ]; then printf "%s\n" "$local_subnets"; else echo "None found."; fi
+	else
+		echo "Error detecting $family subnets." >&2
+	fi
+	[ -z "$subnets_only" ] && echo
+
+	return $rv1
 )
 
 
+## Main
 
 ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
 ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
@@ -64,12 +91,11 @@ maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
 subnet_regex_ipv4="^${ipv4_regex}/${maskbits_regex_ipv4}$"
 subnet_regex_ipv6="^${ipv6_regex}/${maskbits_regex_ipv6}$"
 
+if [ -n "$family_arg" ]; then families="$family_arg"; else families="inet inet6"; fi
+
 rv=0
-for family in inet inet6; do
-	localsubnets="$(get_local_subnets "$family")"; rv=$((rv + $?))
-	echo "Local $family subnets:" >&2
-	if [ -n "$localsubnets" ]; then printf "%s\n" "$localsubnets"; else echo "None found." >&2; fi
-	echo >&2
+for family in $families; do
+	get_local_subnets "$family"; rv=$((rv + $?))
 done
 
 exit $rv
