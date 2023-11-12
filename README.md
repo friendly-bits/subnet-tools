@@ -35,7 +35,9 @@ Tested on Debian-based Linux distributions and on OpenWRT.
 Requires the aggregate-subnets.sh script to process found ip addresses.
 
 Options:
+
 '-s': only output aggregated subnets
+
 '-f <family>': only check subnets for specified family (inet or inet6)
 
 ## Dependencies
