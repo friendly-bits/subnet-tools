@@ -34,25 +34,25 @@ get_local_subnets() (
 
 	case "$family" in
 		inet )
-			# get local interface names. filters by "broadcast" because this seems to always filter out WAN interfaces
-			local_ifaces_ipv4="$(ip -f inet route show table local | grep -i broadcast | grep -i -v ' lo ' | \
+			# get local interface names. filters by "scope link" because this should filter out WAN interfaces
+			local_ifaces_ipv4="$(ip -f inet route show table local scope link | grep -i -v ' lo ' | \
 				awk '{for(i=1; i<=NF; i++) if($i~/^dev$/) print $(i+1)}' | sort -u)"
 
 			# get ipv4 addresses with mask bits, corresponding to local interfaces
-			# awk prints the next word after 'inet'
-			# grep validates found string as ipv4 address with mask bits
+			# awk prints the next string after 'inet'
+			# grep validates the string as ipv4 address with mask bits
 			local_addresses="$(
 				for iface in $local_ifaces_ipv4; do
-					ip -o -f "$family" addr show "$iface" | \
+					ip -o -f inet addr show "$iface" | \
 					awk '{for(i=1; i<=NF; i++) if($i~/^inet$/) print $(i+1)}' | grep -E "^$subnet_regex_ipv4$"
 				done
 			)"
 		;;
 		inet6 )
 			# get local ipv6 addresses with mask bits
-			# awk prints the next word after 'inet6'
+			# awk prints the next string after 'inet6'
 			# 1st grep filters for ULA (unique local addresses with prefix 'fdxx') and link-nocal addresses (fe80::)
-			# 2nd grep validates found string as ipv6 address with mask bits
+			# 2nd grep validates the string as ipv6 address with mask bits
 			local_addresses="$(ip -o -f inet6 addr show | awk '{for(i=1; i<=NF; i++) if($i~/^inet6$/) print $(i+1)}' | \
 				grep -E -i '^fd[0-9a-f]{0,2}:|^fe80:' | grep -E -i "^$subnet_regex_ipv6$")"
 		;;
