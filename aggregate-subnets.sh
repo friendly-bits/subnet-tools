@@ -86,7 +86,7 @@ for subnet in $input_subnets; do
 	subnets_hex="$(printf "%s/%s\n%s" "$maskbits" "$subnet_hex" "$subnets_hex")"
 done
 
-# remove duplicates, sort by mask bits, remove empty lines if any
+# sort by mask bits, remove empty lines if any
 sorted_subnets_hex="$(printf "%s\n" "$subnets_hex" | sort -n | awk -F_ '$1{print $1}')"
 
 while [ -n "$sorted_subnets_hex" ]; do
