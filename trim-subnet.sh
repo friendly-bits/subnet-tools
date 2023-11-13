@@ -81,6 +81,7 @@ expand_ipv6() (
 # returns a compressed ipv6 address in the format recommended by RFC5952
 # expects a fully expanded and merged ipv6 address as input (no colons)
 compress_ipv6 () (
+	ip=""
 	# add leading colon
 	quads_merged="${1}"
 	[ -z "$quads_merged" ] && { echo "compress_ipv6(): Error: received an empty string." >&2; return 1; }
@@ -118,7 +119,6 @@ compress_ipv6 () (
 format_ip() (
 	ip_hex="$1"
 	family="$2"
-
 	[ -z "$ip_hex" ] && { echo "format_ip(): Error: received empty value instead of ip_hex." >&2; return 1; }
 	[ -z "$family" ] && { echo "format_ip(): Error: received empty value for ip family." >&2; return 1; }
 	case "$family" in
@@ -223,6 +223,7 @@ test_ip_route_get() {
 }
 
 # performs bitwise AND on the ip address and the mask
+# after optimizations, mostly just copies bits or generates 0's
 bitwise_and() (
 	ip_hex="$1"; mask_hex="$2"; maskbits="$3"
 
@@ -232,19 +233,26 @@ bitwise_and() (
 	# characters representing each chunk
 	char_num=$((chunk_len / 4))
 
-	# split input into whitespace-separated chunks
-	ip_chunks="$(printf "%s" "$ip_hex" | sed 's/.\{'$char_num'\}/& /g;s/[ ]$//')"
-	mask_chunks="$(printf "%s" "$mask_hex" | sed 's/.\{'$char_num'\}/& /g;s/[ ]$//')"
-
 	bits_processed=0
 	for i in $(seq 1 $(( mask_len / chunk_len )) ); do
-		mask_chunk="$(printf "%s" "$mask_chunks" | cut -d' ' -f "$i")"
-		ip_chunk="$(printf "%s" "$ip_chunks" | cut -d' ' -f "$i")"
-		b=$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ) || \
-							{ echo "$me: Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; exit 1; }
-		printf "%s" "$b"
+		chunk_start=$((1 + (i - 1)*char_num))
+		chunk_end=$((i*char_num))
+
+		ip_chunk="$(printf "%s" "$ip_hex" | cut -c${chunk_start}-${chunk_end} )"
 
 		bits_processed=$((bits_processed + chunk_len))
+
+		# shellcheck disable=SC2086
+		# skip calculation where we can simply copy the bits
+		if [ $bits_processed -le $maskbits ]; then
+			printf "%s" "$ip_chunk"
+		else
+			mask_chunk="$(printf "%s" "$mask_hex" | cut -c${chunk_start}-${chunk_end} )"
+			ip_chunk=$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ) || \
+				{ echo "bitwise_and(): Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; exit 1; }
+			printf "%s" "$ip_chunk"
+		fi
+
 
 		# shellcheck disable=SC2086
 		# if we processed $maskbits bits already, no need to calculate further - just append 0's
