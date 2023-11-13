@@ -148,6 +148,8 @@ format_ip() (
 # generates a mask represented as a hex number
 generate_mask() (
 	maskbits="$1"
+	mask_len="$2"
+	ip_bytes=$((mask_len/8))
 
 	[ -z "$maskbits" ] && { echo "generate_mask(): Error: received empty value instead of mask bits." >&2; return 1; }
 
@@ -302,8 +304,8 @@ trim_subnet() {
 	[ -z "$family" ] && { echo "trim_subnet(): Error: failed to detect the family for address '$input_addr'." >&2; return 1; }
 
 	case "$family" in
-		inet ) ip_bytes=4; mask_len=32; addr_regex="$ipv4_regex" ;;
-		inet6 ) ip_bytes=16; mask_len=128; addr_regex="$ipv6_regex" ;;
+		inet ) mask_len=32; addr_regex="$ipv4_regex" ;;
+		inet6 ) mask_len=128; addr_regex="$ipv6_regex" ;;
 		* ) echo "trim_subnet(): Error: invalid family '$family'" >&2; return 1 ;;
 	esac
 
@@ -316,7 +318,7 @@ trim_subnet() {
 
 	# convert ip to hex number
 	ip_hex="$(ip_to_hex "$input_addr" "$family")" || return 1
-	mask_hex="$(generate_mask "$maskbits")" || return 1
+	mask_hex="$(generate_mask "$maskbits" $mask_len)" || return 1
 
 	# perform bitwise AND on the ip address and the mask
 	newip_hex="$(bitwise_and "$ip_hex" "$mask_hex" "$maskbits")"
