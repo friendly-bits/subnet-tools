@@ -172,8 +172,9 @@ generate_mask() (
 # if 'ip route get' command is working correctly, validates the address through it
 # then performs regex validation
 validate_ip () (
-	addr="$1"
+	addr="$1"; addr_regex="$2"
 	[ -z "$addr" ] && { echo "validate_ip(): Error:- received an empty ip address." >&2; return 1; }
+	[ -z "$addr_regex" ] && { echo "validate_ip: Error: address regex has not been specified." >&2; return 1; }
 
 	if [ -z "$ip_route_get_disable" ]; then
 		# using the 'ip route get' command to put the address through kernel's validation
@@ -186,7 +187,6 @@ validate_ip () (
 	fi
 
 	# regex validation
-	[ -z "$addr_regex" ] && { echo "validate_ip: Error: address regex has not been specified." >&2; return 1; }
 	printf "%s\n" "$addr" | tr ' ' "\n" | grep -E "^$addr_regex$" > /dev/null || \
 		{ echo "validate_ip(): Error: failed to validate addresses '$addr' with regex." >&2; return 1; }
 	return 0
@@ -194,6 +194,7 @@ validate_ip () (
 
 # tests whether 'ip route get' command works for ip validation
 test_ip_route_get() {
+	family="$1"
 	case "$family" in
 		inet ) legal_addr="127.0.0.1"; illegal_addr="127.0.0.256" ;;
 		inet6 ) legal_addr="::1"; illegal_addr=":a:1" ;;
@@ -227,7 +228,7 @@ test_ip_route_get() {
 # performs bitwise AND on the ip address and the mask
 # after optimizations, mostly just copies bits or generates 0's
 bitwise_and() (
-	ip_hex="$1"; mask_hex="$2"; maskbits="$3"
+	ip_hex="$1"; mask_hex="$2"; maskbits="$3"; mask_len="$4"
 
 	# chunk length in bits
 	chunk_len=32
@@ -312,22 +313,22 @@ trim_subnet() {
 	# validate mask bits
 	if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $mask_len ]; then echo "trim_subnet(): Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
 
-	test_ip_route_get	
+	test_ip_route_get "$family" || return 1
 
-	validate_ip "${input_addr}" || return 1
+	validate_ip "${input_addr}" "$addr_regex" || return 1
 
 	# convert ip to hex number
 	ip_hex="$(ip_to_hex "$input_addr" "$family")" || return 1
 	mask_hex="$(generate_mask "$maskbits" $mask_len)" || return 1
 
 	# perform bitwise AND on the ip address and the mask
-	newip_hex="$(bitwise_and "$ip_hex" "$mask_hex" "$maskbits")"
+	newip_hex="$(bitwise_and "$ip_hex" "$mask_hex" "$maskbits" $mask_len)" || return 1
 	new_ip="$(format_ip "$newip_hex" "$family")" || return 1
 
 	subnet="${new_ip}/$maskbits"
 
 	# shellcheck disable=SC2015
-	validate_ip "$new_ip" && { printf "%s\n" "$subnet"; return 0; } || return 1
+	validate_ip "$new_ip" "$addr_regex" && { printf "%s\n" "$subnet"; return 0; } || return 1
 }
 
 #### Constants
