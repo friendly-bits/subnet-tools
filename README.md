@@ -40,6 +40,9 @@ Options:
 
 `-f <family>`: only check subnets for specified family (inet or inet6)
 
+## detect-local-subnets-AIO.sh
+Same as above but as a stand-alone script (does not require aggregate-subnets.sh and trim-subnet.sh).
+
 ## Dependencies
 **_awk_**, **_grep_** with ERE support, **_sed_** and some additional standard Unix utilities like **_tr_**, **_sort_** and **_cut_**. All these are included with any desktop Linux distribution and probably with most other Unix-like operating systems.
 
