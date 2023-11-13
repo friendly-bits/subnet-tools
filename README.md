@@ -41,7 +41,7 @@ Options:
 `-f <family>`: only check subnets for specified family (inet or inet6)
 
 ## Dependencies
-**_awk_**, **_grep_** with ERE support, **_sed_** and some additional standard Unix utilities like **_tr_**, **_sort_** and **_cut_**.
+**_awk_**, **_grep_** with ERE support, **_sed_** and some additional standard Unix utilities like **_tr_**, **_sort_** and **_cut_**. All these are included with any desktop Linux distribution and probably with most other Unix-like operating systems.
 
 The code is POSIX-compliant (tested on dash and on bash) and an effort has been made to avoid using non-POSIX options of the aforementioned utilities.
 However, only tested with the GNU variants, and only on Linux (works on OpenWRT as well as on desktop Linux distributions).
