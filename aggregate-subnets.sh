@@ -99,40 +99,40 @@ while [ -n "$sorted_subnets_hex" ]; do
 	maskbits="$(printf "%s" "$subnet1" | awk -F/ '{print $1}')"
 
 	# chop off mask bits
-	ip1="$(printf "%s" "$subnet1" | cut -d/ -f2)"
+	ip="$(printf "%s" "$subnet1" | cut -d/ -f2)"
 
 	# generate mask
 	mask="$(generate_mask "$maskbits")" || exit 1
 
-	## perform bitwise AND on the ip and the mask
-
-	# split input into whitespace-separated chunks
-	ip_chunks="$(printf "%s" "$ip1" | sed 's/.\{'$char_num'\}/& /g;s/[ ]$//')"
-	mask_chunks="$(printf "%s" "$mask" | sed 's/.\{'$char_num'\}/& /g;s/[ ]$//')"
-
-	ip1=""; ip1_chunks=""; bits_processed=0
+	ip1=""; bits_processed=0
 	for i in $(seq 1 $(( mask_len / chunk_len )) ); do
-		mask_chunk="$(printf "%s" "$mask_chunks" | cut -d' ' -f "$i")"
-		ip_chunk="$(printf "%s" "$ip_chunks" | cut -d' ' -f "$i")"
-		ip_chunk="$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) )" || \
-			{ echo "$me: Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'." >&2; exit 1; }
-		ip1="$ip1$(printf "%s" "${ip_chunk}")"
-		ip1_chunks="$ip1_chunks $(printf "%s" "${ip_chunk}")"
 		bits_processed=$((bits_processed + chunk_len))
 
-		[ "$debug" ] && echo "ip1_chunks: '$ip1_chunks'" >&2
+		chunk_start=$((1 + (i - 1)*char_num))
+		chunk_end=$((i*char_num))
+
+		ip_chunk="$(printf "%s" "$ip" | cut -c${chunk_start}-${chunk_end} )"
+		# shellcheck disable=SC2086
+		# skip calculation where we can simply copy the bits
+		if [ $bits_processed -gt $maskbits ]; then
+			mask_chunk="$(printf "%s" "$mask" | cut -c${chunk_start}-${chunk_end} )"
+			ip_chunk=$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ) || \
+				{ echo "$me: Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; exit 1; }
+			[ "$debug" ] && echo "Calculated: ip_chunk: '$ip_chunk', mask_chunk: '$mask_chunk'" >&2
+		fi
+
+		ip1="$ip1$ip_chunk"
 
 		# if we processed $maskbits bits already, no need to calculate further
 		if [ "$bits_processed" -ge "$maskbits" ]; then
 			bytes_missing=$(( (mask_len - bits_processed) /8 ))
 			# repeat 00 for every missing byte
-			for b in $(seq 1 $bytes_missing); do ip1="$ip1$(printf "%s" '00')"; done
+			zeroes=""
+			for b in $(seq 1 $bytes_missing); do zeroes="${zeroes}00"; done
+			ip1="$ip1$zeroes"
 			break
 		fi
 	done
-
-	# remove leading whitespace
-	ip1_chunks="${ip1_chunks# }"
 
 	# remove current subnet from the list
 	sorted_subnets_hex="$(printf "%s" "$sorted_subnets_hex" | tail -n +2)"
@@ -146,23 +146,26 @@ while [ -n "$sorted_subnets_hex" ]; do
 		if [ -n "$subnet2_hex" ]; then
 			# chop off mask bits
 			ip2="$(printf "%s" "$subnet2_hex" | cut -d/ -f2)"
-			# split into whitespace-separated chunks
-			ip2_chunks="$(printf "%s" "$ip2" | sed 's/.\{'$char_num'\}/& /g;s/[ ]$//')"
-			[ "$debug" ] && echo "ip2_chunks: '$ip2_chunks'" >&2
 
-			ip2_chunk=""; ip2_differs=""; bytes_diff=0; bits_processed=0
+			ip2_differs=""; bytes_diff=0; bits_processed=0
 
 			for i in $(seq 1 $(( mask_len / chunk_len )) ); do
-				ip1_chunk="$(printf "%s" "$ip1_chunks" | cut -d' ' -f "$i")"
-				[ "$debug" ] && echo "ip1_chunk: '$ip1_chunk'" >&2
+				chunk_start=$((1 + (i - 1)*char_num))
+				chunk_end=$((i*char_num))
+				ip1_chunk="$(printf "%s" "$ip1" | cut -c${chunk_start}-${chunk_end} )"
+				ip2_chunk="$(printf "%s" "$ip2" | cut -c${chunk_start}-${chunk_end} )"
+				# [ "$debug" ] && echo "ip1_chunk: '$ip1_chunk', ip2_chunk: '$ip2_chunk'" >&2
+				bits_processed=$((bits_processed + chunk_len))
 
-				# perform bitwise AND on the 2nd address and the mask of 1st address
-				mask_chunk="$(printf "%s" "$mask_chunks" | cut -d' ' -f "$i")"
-				ip2_chunk="$(printf "%s" "$ip2_chunks" | cut -d' ' -f "$i")"
-				# bitwise AND on a chunk of subnet2 and corresponding chunk of mask from subnet1
-				ip2_chunk=$(printf "%0${char_num}x" $(( 0x$ip2_chunk & 0x$mask_chunk )) ) || \
-							{ echo "$me: Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'." >&2; exit 1; }
-				[ "$debug" ] && echo "mask_chunk: '$mask_chunk', ip2_chunk: '$ip2_chunk'" >&2
+				# shellcheck disable=SC2086
+				# only calculate where necessary
+				if [ $bits_processed -gt $maskbits ]; then
+					# bitwise AND on a chunk of subnet2 and corresponding chunk of mask from subnet1
+					mask_chunk="$(printf "%s" "$mask" | cut -c${chunk_start}-${chunk_end} )"
+
+					ip2_chunk=$(printf "%0${char_num}x" $(( 0x$ip2_chunk & 0x$mask_chunk )) ) || \
+						{ echo "$me: Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; exit 1; }
+				fi
 
 				# check for difference between current chunk in subnet1 and subnet2
 
@@ -174,8 +177,6 @@ while [ -n "$sorted_subnets_hex" ]; do
 					ip2_differs=true; break
 				fi
 
-				bits_processed=$((bits_processed + chunk_len))
-
 				# if we processed $maskbits bits already, no need to calculate further
 				[ "$bits_processed" -ge "$maskbits" ] && break
 			done
@@ -184,7 +185,6 @@ while [ -n "$sorted_subnets_hex" ]; do
 			if [ -z "$ip2_differs" ]; then
 				[ "$debug" ] && echo "No difference found" >&2
 				sorted_subnets_hex="$(printf "%s\n" "$sorted_subnets_hex" | grep -vx "$subnet2_hex")"
-				chunks_processed=0
 			fi
 		fi
 		remaining_subnets_hex="$(printf "%s" "$remaining_subnets_hex" | tail -n +2)"
