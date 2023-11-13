@@ -492,9 +492,9 @@ unset rv rv1 rv2
 
 if [ -n "$family_arg" ]; then families="$(printf "%s" "$family_arg" | awk '{print tolower($0)}')"; else families="inet inet6"; fi
 
-rv=0
+rv_global=0
 for family in $families; do
-	get_local_subnets "$family"; rv=$((rv + $?))
+	get_local_subnets "$family"; rv_global=$((rv_global + $?))
 done
 
-exit $rv
+exit $rv_global
