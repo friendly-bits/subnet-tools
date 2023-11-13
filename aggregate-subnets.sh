@@ -57,8 +57,8 @@ char_num=$((chunk_len / 4))
 [ -z "$family" ] && { echo "$me: Specify family (inet or inet6) in 1st argument." >&2; exit 1; }
 
 case "$family" in
-	inet ) ip_bytes=4; mask_len=32; addr_regex="$ipv4_regex" ;;
-	inet6 ) ip_bytes=16; mask_len=128; addr_regex="$ipv6_regex" ;;
+	inet ) mask_len=32; addr_regex="$ipv4_regex" ;;
+	inet6 ) mask_len=128; addr_regex="$ipv6_regex" ;;
 	* ) echo "$me: Invalid family '$family'. Specify family (inet or inet6) in 1st argument." >&2; exit 1
 esac
 
@@ -102,7 +102,7 @@ while [ -n "$sorted_subnets_hex" ]; do
 	ip="$(printf "%s" "$subnet1" | cut -d/ -f2)"
 
 	# generate mask
-	mask="$(generate_mask "$maskbits")" || exit 1
+	mask="$(generate_mask "$maskbits" $mask_len)" || exit 1
 
 	ip1=""; bits_processed=0
 	for i in $(seq 1 $(( mask_len / chunk_len )) ); do
