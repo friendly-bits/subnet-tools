@@ -302,7 +302,7 @@ aggregate_subnets() (
 		# validate mask bits
 		if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $mask_len ]; then echo "$me: Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
 
-		# convert ip address to hex. ip_to_hex() is in the sourced script
+		# convert ip address to hex
 		subnet_hex="$(ip_to_hex "$input_addr" "$family")" || return 1
 		# prepend mask bits
 		subnets_hex="$(printf "%s/%s\n%s" "$maskbits" "$subnet_hex" "$subnets_hex")"
