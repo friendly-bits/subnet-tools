@@ -26,7 +26,7 @@ export source_trim_subnet="true"
 
 #### Functions
 
-aggregate_subnets() (
+aggregate_subnets() {
 	family="$1"; input_subnets="$2"
 	# chunk length in bits
 	chunk_len=32
@@ -37,7 +37,7 @@ aggregate_subnets() (
 	# remove duplicates from input, convert to lower case
 	input_subnets="$(printf "%s" "$input_subnets" | tr ' ' '\n' | sort -u | tr '\n' ' ' | awk '{print tolower($0)}')"
 
-	validate_ip "$(printf "%s" "$input_subnets" | awk -F/ '{print $1}')" "$addr_regex" || return 1
+	validate_ip "${input_subnets%/*}" "$addr_regex" || return 1
 
 	for subnet in $input_subnets; do
 		# get mask bits
@@ -45,15 +45,16 @@ aggregate_subnets() (
 		[ -z "$maskbits" ] && { echo "$me: Error: input '$subnet' has no mask bits." >&2; return 1; }
 
 		# chop off mask bits
-		input_addr="$(printf "%s" "$subnet" | awk -F/ '{print $1}')"
+		input_addr="${subnet%/*}"
 
+		# shellcheck disable=SC2086
 		# validate mask bits
 		if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $mask_len ]; then echo "$me: Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
 
-		# convert ip address to hex. ip_to_hex() is in the sourced script
+		# convert ip address to hex
 		subnet_hex="$(ip_to_hex "$input_addr" "$family")" || return 1
 		# prepend mask bits
-		subnets_hex="$(printf "%s/%s\n%s" "$maskbits" "$subnet_hex" "$subnets_hex")"
+		subnets_hex="$(printf "%s\n%s" "$maskbits/$subnet_hex" "$subnets_hex")"
 	done
 
 	# sort by mask bits, remove empty lines if any
@@ -68,13 +69,14 @@ aggregate_subnets() (
 		[ "$debug" ] && echo "processing subnet: $subnet1" >&2
 
 		# get mask bits
-		maskbits="$(printf "%s" "$subnet1" | awk -F/ '{print $1}')"
-
+		maskbits="${subnet1%/*}"
 		# chop off mask bits
-		ip="$(printf "%s" "$subnet1" | cut -d/ -f2)"
+		ip="${subnet1#*/}"
 
+		# shellcheck disable=SC2086
 		# generate mask
 		mask="$(generate_mask "$maskbits" $mask_len)" || return 1
+		# shellcheck disable=SC2086
 		# calculate ip & mask
 		ip1="$(bitwise_and "$ip" "$mask" "$maskbits" $mask_len)" || return 1
 
@@ -89,7 +91,7 @@ aggregate_subnets() (
 
 			if [ -n "$subnet2_hex" ]; then
 				# chop off mask bits
-				ip2="$(printf "%s" "$subnet2_hex" | cut -d/ -f2)"
+				ip2="${subnet2_hex#*/}"
 
 				ip2_differs=""; bytes_diff=0; bits_processed=0
 
@@ -147,7 +149,7 @@ aggregate_subnets() (
 	done
 
 	printf "%s\n" "$res_subnets"
-)
+}
 
 
 #### Constants
@@ -156,8 +158,6 @@ newline='
 ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
 ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
 maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
-
-
 
 # convert to lower case
 family="$(printf "%s" "$1" | awk '{print tolower($0)}')"; shift
@@ -187,6 +187,5 @@ rv=$((rv1 || ! rv2))
 unset rv rv1 rv2
 
 test_ip_route_get "$family" || exit 1
-
 
 aggregate_subnets "$family" "$*"; exit $?
