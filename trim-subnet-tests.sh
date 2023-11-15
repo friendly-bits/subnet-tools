@@ -58,7 +58,7 @@ fd0e21465cf545600000000000000001 fd0e:2146:5cf5:4560::1
 			fi
 
 			# # this tests the validate_ip() function
-			# validate_ip "$result" "inet6" || echo "Expanded ipv6 failed validation: '$result'." >&2
+			# validate_ip "$result" "$addr_regex" || echo "Expanded ipv6 failed validation: '$result'." >&2
 
 			# compress_ipv6 test
 			result="$(compress_ipv6 "$expanded_ip")"
@@ -68,7 +68,7 @@ fd0e21465cf545600000000000000001 fd0e:2146:5cf5:4560::1
 			fi
 
 			# this tests the validate_ip() function
-			validate_ip "$result" "inet6" || echo "Compressed ipv6 failed validation: '$result'." >&2
+			validate_ip "$result" "$addr_regex" || echo "Compressed ipv6 failed validation: '$result'." >&2
 
 			tests_done=$((tests_done+1))
 		fi
