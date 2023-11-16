@@ -10,7 +10,7 @@ Examples:
 The auxiliary script _trim-subnet-tests.sh_ tests some functions found in the main script. It's not required for the main script.
 
 ## aggregate-subnets.sh
-Unix shell script which calculates an efficient configuration for subnets given as an input by trimming down each input subnet to its mask bits and removing subnets that are encapsulated inside other subnets on the list. Designed for easier automated creation of firewall rules. Utilizes the above trim-subnet.sh script as a library.
+Unix shell script which calculates an efficient configuration for subnets given as an input by trimming down each input subnet to its mask bits and removing subnets that are encapsulated inside other subnets on the list. Intended for easier automated creation of firewall rules. Utilizes the above trim-subnet.sh script as a library.
 
 Options:
 
@@ -56,3 +56,4 @@ Probably should work on other Unixes but may need slight modifications.
 ## Notes
 - These scripts do not make any changes to the system they're running on, do not gather any user data and do not send it anywhere. `trim-subnet.sh` and `aggregate-subnets.sh` simply take your input, do some calculations and report the results back to your console. `detect-local-subnets.sh` and `detect-local-subnets-AIO.sh` examine the network configuration on the specific machine they're running on (without making any external connections), do some calculation and report the results back to your console. All that provided that you downloaded the scripts from the official source, which is `https://github.com/blunderful-scripts/subnet-tools`.
 - If you find any bugs or have a suggestion for code improvement, please let me know.
+- If you find this repository useful, please take a second to give it a star.
