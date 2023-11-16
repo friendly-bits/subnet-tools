@@ -28,8 +28,12 @@ export source_trim_subnet="true"
 
 aggregate_subnets() {
 	family="$1"; input_subnets="$2"
-	# chunk length in bits
-	chunk_len=32
+
+	case "$family" in
+		inet ) addr_len=32; chunk_len=16; addr_regex="$ipv4_regex" ;;
+		inet6 ) addr_len=128; chunk_len=32; addr_regex="$ipv6_regex" ;;
+		* ) echo "aggregate_subnets(): invalid family '$family'." >&2; return 1 ;;
+	esac
 
 	# characters representing each chunk
 	char_num=$((chunk_len / 4))
@@ -42,14 +46,13 @@ aggregate_subnets() {
 	for subnet in $input_subnets; do
 		# get mask bits
 		maskbits="$(printf "%s" "$subnet" | awk -F/ '{print $2}')"
-		[ -z "$maskbits" ] && { echo "$me: Error: input '$subnet' has no mask bits." >&2; return 1; }
-
+		case "$maskbits" in ''|*[!0-9]*) echo "aggregate_subnets(): Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1;;esac
 		# chop off mask bits
 		input_addr="${subnet%/*}"
 
 		# shellcheck disable=SC2086
 		# validate mask bits
-		if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $mask_len ]; then echo "$me: Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
+		if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $addr_len ]; then echo "aggregate_subnets(): Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
 
 		# convert ip address to hex
 		subnet_hex="$(ip_to_hex "$input_addr" "$family")" || return 1
@@ -74,11 +77,14 @@ aggregate_subnets() {
 		ip="${subnet1#*/}"
 
 		# shellcheck disable=SC2086
-		# generate mask
-		mask="$(generate_mask "$maskbits" $mask_len)" || return 1
+		# generate mask if it's not been generated yet
+		if eval [ -z "\$mask_${family}_${maskbits}" ]; then eval mask_${family}_${maskbits}="$(generate_mask "$maskbits" $addr_len)" || return 1; fi
+		eval mask=\$mask_"${family}_${maskbits}"
+
 		# shellcheck disable=SC2086
 		# calculate ip & mask
-		ip1="$(bitwise_and "$ip" "$mask" "$maskbits" $mask_len)" || return 1
+		ip1="$(bitwise_and "$ip" "$mask" "$maskbits" $addr_len $chunk_len)" || return 1
+		[ "$debug" ] && echo "calculated '$ip' & '$mask' = '$ip1'" >&2
 
 		# remove current subnet from the list
 		sorted_subnets_hex="$(printf "%s" "$sorted_subnets_hex" | tail -n +2)"
@@ -93,39 +99,56 @@ aggregate_subnets() {
 				# chop off mask bits
 				ip2="${subnet2_hex#*/}"
 
-				ip2_differs=""; bytes_diff=0; bits_processed=0
+				ip2_differs=""; bytes_diff=0
+				bits_processed=0; char_offset=0
 
-				for i in $(seq 1 $(( mask_len / chunk_len )) ); do
-					chunk_start=$((1 + (i - 1)*char_num))
-					chunk_end=$((i*char_num))
+				# shellcheck disable=SC2086
+				# compare ~ $maskbits bits of ip1 and ip2
+				while [ $((bits_processed + chunk_len)) -le $maskbits ]; do
+					chunk_start=$((char_offset + 1))
+					chunk_end=$((char_offset + char_num))
+
 					ip1_chunk="$(printf "%s" "$ip1" | cut -c${chunk_start}-${chunk_end} )"
 					ip2_chunk="$(printf "%s" "$ip2" | cut -c${chunk_start}-${chunk_end} )"
-					# [ "$debug" ] && echo "ip1_chunk: '$ip1_chunk', ip2_chunk: '$ip2_chunk'" >&2
-					bits_processed=$((bits_processed + chunk_len))
 
-					# shellcheck disable=SC2086
-					# only calculate where necessary
-					if [ $bits_processed -gt $maskbits ]; then
-						# bitwise AND on a chunk of subnet2 and corresponding chunk of mask from subnet1
-						mask_chunk="$(printf "%s" "$mask" | cut -c${chunk_start}-${chunk_end} )"
-
-						ip2_chunk=$(printf "%0${char_num}x" $(( 0x$ip2_chunk & 0x$mask_chunk )) ) || \
-							{ echo "$me: Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'."; return 1; }
-					fi
-
-					# check for difference between current chunk in subnet1 and subnet2
+					[ "$debug" ] && echo "comparing chunks '$ip1_chunk' - '$ip2_chunk'" >&2
 
 					bytes_diff=$((0x$ip1_chunk - 0x$ip2_chunk)) || \
-								{ echo "$me: Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'." >&2; return 1; }
+								{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'." >&2; return 1; }
 					# if there is any difference, no need to calculate further
 					if [ $bytes_diff -ne 0 ]; then
 						[ "$debug" ] && echo "difference found" >&2
 						ip2_differs=true; break
 					fi
 
-					# if we processed $maskbits bits already, no need to calculate further
-					[ "$bits_processed" -ge "$maskbits" ] && break
+					bits_processed=$((bits_processed + chunk_len))
+					char_offset=$((char_offset + char_num))
 				done
+
+				# shellcheck disable=SC2086
+				# if needed, calculate the next ip2 chunk and compare to ip1 chunk
+				if [ $bits_processed -ne $maskbits ] && [ -z  "$ip2_differs" ]; then
+					[ "$debug" ] && echo "calculating last chunk..." >&2
+					chunk_start=$((char_offset + 1))
+					chunk_end=$((char_offset + char_num))
+
+					ip1_chunk="$(printf "%s" "$ip1" | cut -c${chunk_start}-${chunk_end} )"
+					ip2_chunk="$(printf "%s" "$ip2" | cut -c${chunk_start}-${chunk_end} )"
+					mask_chunk="$(printf "%s" "$mask" | cut -c${chunk_start}-${chunk_end} )"
+
+					# bitwise $ip2_chunk & $mask_chunk
+					ip2_chunk=$(printf "%0${char_num}x" $(( 0x$ip2_chunk & 0x$mask_chunk )) ) || \
+						{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'."; return 1; }
+
+					[ "$debug" ] && echo "comparing chunks '$ip1_chunk' - '$ip2_chunk'" >&2
+
+					bytes_diff=$((0x$ip1_chunk - 0x$ip2_chunk)) || \
+								{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'." >&2; return 1; }
+					if [ $bytes_diff -ne 0 ]; then
+						[ "$debug" ] && echo "difference found" >&2
+						ip2_differs=true
+					fi
+				fi
 
 				# if no differences found, subnet2 is encapsulated in subnet1 - remove subnet2 from the list
 				if [ -z "$ip2_differs" ]; then
@@ -136,7 +159,7 @@ aggregate_subnets() {
 			remaining_subnets_hex="$(printf "%s" "$remaining_subnets_hex" | tail -n +2)"
 		done
 
-		# format from hex back to ip
+		# format from hex number back to ip
 		ip1="$(format_ip "$ip1" "$family")" || return 1
 		if validate_ip "$ip1" "$addr_regex"; then
 			# append mask bits
@@ -163,12 +186,6 @@ maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
 family="$(printf "%s" "$1" | awk '{print tolower($0)}')"; shift
 
 [ -z "$family" ] && { echo "$me: Specify family (inet or inet6) in 1st argument." >&2; exit 1; }
-
-case "$family" in
-	inet ) mask_len=32; addr_regex="$ipv4_regex" ;;
-	inet6 ) mask_len=128; addr_regex="$ipv6_regex" ;;
-	* ) echo "$me: Invalid family '$family'. Specify family (inet or inet6) in 1st argument." >&2; exit 1
-esac
 
 
 #### Main
