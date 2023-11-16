@@ -10,7 +10,7 @@ Examples:
 The auxiliary script _trim-subnet-tests.sh_ tests some functions found in the main script. It's not required for the main script.
 
 ## aggregate-subnets.sh
-Unix shell script which calculates an efficient configuration for subnets given as an input by trimming down each input subnet to its mask bits and removing subnets that are encapsulated inside other subnets on the list. Designed for easier automated creation of firewall rules, but perhaps someone has a different application for this functionality. Utilizes the above trim-subnet.sh script as a library. Requires to specify family (inet or inet6) as 1st argument, then any number of subnets to aggregate.
+Unix shell script which calculates an efficient configuration for subnets given as an input by trimming down each input subnet to its mask bits and removing subnets that are encapsulated inside other subnets on the list. Designed for easier automated creation of firewall rules, but perhaps someone has a different application for this functionality. Utilizes the above trim-subnet.sh script as a library. Requires to specify family (`inet` for ipv4 or `inet6` for ipv6) as 1st argument, then any number of subnets to aggregate.
 
 Examples:
 - Input: **`sh aggregate-subnets.sh inet 192.168.1.1/24 192.168.0.0/16 192.169.0.9/8`**.
@@ -35,7 +35,7 @@ Options:
 
 `-s`: only output aggregated subnets
 
-`-f <family>`: only check subnets for specified family (inet or inet6)
+`-f <family>`: only check subnets for specified family (`inet` for ipv4 or `inet6` for ipv6)
 
 ## detect-local-subnets-AIO.sh
 Same as above but as a stand-alone script (does not require aggregate-subnets.sh and trim-subnet.sh).
