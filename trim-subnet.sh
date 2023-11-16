@@ -20,8 +20,7 @@
 
 #### Initial setup
 export LC_ALL=C
-me=$(basename "$0")
-
+#debug=true
 
 #### Functions
 
@@ -148,12 +147,12 @@ generate_mask()
 	maskbits="$1"
 
 	# address length (32 bits for ipv4, 128 bits for ipv6)
-	mask_len="$2"
+	addr_len="$2"
 
 	[ -z "$maskbits" ] && { echo "generate_mask(): Error: received empty value instead of mask bits." >&2; return 1; }
-	[ -z "$mask_len" ] && { echo "generate_mask(): Error: received empty value instead of mask length." >&2; return 1; }
+	[ -z "$addr_len" ] && { echo "generate_mask(): Error: received empty value instead of mask length." >&2; return 1; }
 
-	mask_bytes=$((mask_len/8))
+	mask_bytes=$((addr_len/8))
 
 	mask="" bytes_done=0 i=0 sum=0 cur=128
 	octets='' frac=''
@@ -234,8 +233,8 @@ test_ip_route_get() {
 	rv=$(( rv_legal || rv_legal_exp || ! rv_illegal || ! rv_illegal_exp ))
 
 	if [ $rv -ne 0 ]; then
-		echo "$me: Note: command 'ip route get' is not working as expected (or at all) on this device." >&2
-		echo "$me: Disabling validation using the 'ip route get' command. Less reliable regex validation will be used instead." >&2
+		echo "test_ip_route_get(): Note: command 'ip route get' is not working as expected (or at all) on this device." >&2
+		echo "test_ip_route_get(): Disabling validation using the 'ip route get' command. Less reliable regex validation will be used instead." >&2
 		echo >&2
 		ip_route_get_disable=true
 	fi
@@ -245,45 +244,48 @@ test_ip_route_get() {
 # performs bitwise AND on the ip address and the mask
 # after optimizations, mostly just copies bits or generates 0's
 bitwise_and() {
-	ip_hex="$1"; mask_hex="$2"; maskbits="$3"; mask_len="$4"
-
-	# chunk length in bits
-	chunk_len=32
+	ip_hex="$1"; mask_hex="$2"; maskbits="$3"; addr_len="$4"; chunk_len="$5"
+	[ "$debug" ] && echo "ip_hex: '$ip_hex', mask_hex: '$mask_hex', maskbits: '$maskbits', addr_len: '$addr_len', chunk_len: '$chunk_len'" >&2
 
 	# characters representing each chunk
 	char_num=$((chunk_len / 4))
 
-	bits_processed=0
-	for i in $(seq 1 $(( mask_len / chunk_len )) ); do
-		chunk_start=$((1 + (i - 1)*char_num))
-		chunk_end=$((i*char_num))
+	bits_processed=0; char_offset=0
+	# shellcheck disable=SC2086
+	# copy ~ $maskbits bits
+	while [ $((bits_processed + chunk_len)) -le $maskbits ]; do
+		chunk_start=$((char_offset + 1))
+		chunk_end=$((char_offset + char_num))
 
 		ip_chunk="$(printf "%s" "$ip_hex" | cut -c${chunk_start}-${chunk_end} )"
 
+		printf "%s" "$ip_chunk"
+		[ "$debug" ] && echo "copied ip chunk: '$ip_chunk'" >&2
 		bits_processed=$((bits_processed + chunk_len))
-
-		# shellcheck disable=SC2086
-		# skip calculation where we can simply copy the bits
-		if [ $bits_processed -le $maskbits ]; then
-			printf "%s" "$ip_chunk"
-		else
-			mask_chunk="$(printf "%s" "$mask_hex" | cut -c${chunk_start}-${chunk_end} )"
-			ip_chunk=$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ) || \
-				{ echo "bitwise_and(): Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; return 1; }
-			printf "%s" "$ip_chunk"
-		fi
-
-
-		# shellcheck disable=SC2086
-		# if we processed $maskbits bits already, no need to calculate further - just append 0's
-		if [ $bits_processed -ge $maskbits ]; then
-			bytes_missing=$(( (mask_len - bits_processed)/8 ))
-			# shellcheck disable=SC2034
-			# repeat 0 for every missing character
-			for b in $(seq 1 $bytes_missing); do printf "%s" '00'; done
-			break
-		fi
+		char_offset=$((char_offset + char_num))
 	done
+
+	# shellcheck disable=SC2086
+	# calculate the next chunk if needed
+	if [ $bits_processed -ne $maskbits ]; then
+		chunk_start=$((char_offset + 1))
+		chunk_end=$((char_offset + char_num))
+
+		mask_chunk="$(printf "%s" "$mask_hex" | cut -c${chunk_start}-${chunk_end} )"
+		ip_chunk="$(printf "%s" "$ip_hex" | cut -c${chunk_start}-${chunk_end} )"
+		ip_chunk=$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ) || \
+			{ echo "bitwise_and(): Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; return 1; }
+		printf "%s" "$ip_chunk"
+		[ "$debug" ] && echo "calculated ip chunk: '$ip_chunk'" >&2
+		bits_processed=$((bits_processed + chunk_len))
+	fi
+
+	bytes_missing=$(( (addr_len - bits_processed)/8 ))
+	# repeat 00 for every missing byte
+	[ "$debug" ] && echo "bytes missing: '$bytes_missing'" >&2
+	# shellcheck disable=SC2086,SC2034
+	[ $bytes_missing -gt 0 ] && for b in $(seq 1 $bytes_missing); do printf "%s" '00'; done
+	return 0
 }
 
 # Main
@@ -322,13 +324,13 @@ trim_subnet() {
 	[ -z "$family" ] && { echo "trim_subnet(): Error: failed to detect the family for address '$input_addr'." >&2; return 1; }
 
 	case "$family" in
-		inet ) mask_len=32; addr_regex="$ipv4_regex" ;;
-		inet6 ) mask_len=128; addr_regex="$ipv6_regex" ;;
-		* ) echo "trim_subnet(): Error: invalid family '$family'" >&2; return 1 ;;
+		inet ) addr_len=32; chunk_len=16; addr_regex="$ipv4_regex" ;;
+		inet6 ) addr_len=128; chunk_len=32; addr_regex="$ipv6_regex" ;;
+		* ) echo "trim_subnet(): invalid family '$family'." >&2; return 1 ;;
 	esac
 
 	# validate mask bits
-	if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $mask_len ]; then echo "trim_subnet(): Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
+	if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $addr_len ]; then echo "trim_subnet(): Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
 
 	test_ip_route_get "$family" || return 1
 
@@ -336,10 +338,10 @@ trim_subnet() {
 
 	# convert ip to hex number
 	ip_hex="$(ip_to_hex "$input_addr" "$family")" || return 1
-	mask_hex="$(generate_mask "$maskbits" $mask_len)" || return 1
+	mask_hex="$(generate_mask "$maskbits" $addr_len)" || return 1
 
 	# perform bitwise AND on the ip address and the mask
-	newip_hex="$(bitwise_and "$ip_hex" "$mask_hex" "$maskbits" $mask_len)" || return 1
+	newip_hex="$(bitwise_and "$ip_hex" "$mask_hex" "$maskbits" $addr_len $chunk_len)" || return 1
 	new_ip="$(format_ip "$newip_hex" "$family")" || return 1
 
 	subnet="${new_ip}/$maskbits"
