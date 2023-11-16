@@ -3,9 +3,6 @@
 ## trim-subnet.sh
 Unix shell script which trims an ipv4 or ipv6 address to a given length (expressed in CIDR mask bits) and outputs the resulting subnet.
 
-This is a modified and (hopefully) improved version of some parts of a script found here:
-https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
-
 Examples:
 - Input: **`sh trim-subnet.sh 192.168.4.111/12`**. Output: **`192.160.0.0/12`**
 - Input: **`sh trim-subnet.sh 2001:4567:1111:56ff::1/42`**. Output: **`2001:4567:1100::/42`**
