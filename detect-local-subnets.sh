@@ -11,6 +11,7 @@
 # to only check a specific family (inet or inet6), run with the '-f <family>' argument
 
 export LC_ALL=C
+me=$(basename "$0")
 
 ## Simple args parsing
 args=""
@@ -91,7 +92,12 @@ maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
 subnet_regex_ipv4="${ipv4_regex}/${maskbits_regex_ipv4}"
 subnet_regex_ipv6="${ipv6_regex}/${maskbits_regex_ipv6}"
 
-if [ -n "$family_arg" ]; then families="$family_arg"; else families="inet inet6"; fi
+[ -n "$family_arg" ] && family_arg="$(printf '%s' "$family_arg" | awk '{print tolower($0)}')"
+case "$family_arg" in
+	inet|inet6 ) families="$family_arg" ;;
+	'' ) families="inet inet6" ;;
+	* ) echo "$me: Error: invalid family '$family_arg'." >&2; exit 1 ;;
+esac
 
 rv=0
 for family in $families; do
