@@ -10,19 +10,25 @@ Examples:
 The auxiliary script _trim-subnet-tests.sh_ tests some functions found in the main script. It's not required for the main script.
 
 ## aggregate-subnets.sh
-Unix shell script which calculates an efficient configuration for subnets given as an input by trimming down each input subnet to its mask bits and removing subnets that are encapsulated inside other subnets on the list. Designed for easier automated creation of firewall rules, but perhaps someone has a different application for this functionality. Utilizes the above trim-subnet.sh script as a library. Requires to specify family (`inet` for ipv4 or `inet6` for ipv6) as 1st argument, then any number of subnets to aggregate.
+Unix shell script which calculates an efficient configuration for subnets given as an input by trimming down each input subnet to its mask bits and removing subnets that are encapsulated inside other subnets on the list. Designed for easier automated creation of firewall rules. Utilizes the above trim-subnet.sh script as a library.
+
+Options:
+
+`-f <family>`: force processing subnets for specified family (`inet` for ipv4 or `inet6` for ipv6). If not specified, auto-detects families for input subnets and processes each family separately.
 
 Examples:
-- Input: **`sh aggregate-subnets.sh inet 192.168.1.1/24 192.168.0.0/16 192.169.0.9/8`**.
+- Input: **`sh aggregate-subnets.sh 192.168.1.1/24 192.168.0.0/16 192.169.0.9/8`**.
 
 Output:
 **`192.0.0.0/8`**
 
-- Input: **`sh aggregate-subnets.sh inet 192.168.1.1/24 192.168.0.0/16 192.169.0.9/16`**.
+Input:
+**`sh aggregate-subnets.sh 192.168.1.1/24 192.168.0.0/16 192.169.0.9/16 fd16:1234:5678:ab:1:1:1:1/64 fd16:1234:5678:ab:2:2:2:2/64 fd16:1234:5678:ab::1/128 fd16:1234:5678:cd:1:1:1:1/60 fd16:1234:5678:cd:2:2:2:2/64`**.
 
-Output: **`192.168.0.0/16 192.169.0.0/16`**
-
-(works the same way for ipv6 subnets)
+Output: **`192.169.0.0/16
+192.168.0.0/16
+fd16:1234:5678:ab::/64
+fd16:1234:5678:c0::/60`**
 
 ## detect-local-subnets.sh
 Unix shell script which uses standard utilities to detect local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host).
