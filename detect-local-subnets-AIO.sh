@@ -252,7 +252,8 @@ test_ip_route_get() {
 
 # performs bitwise ip address & the mask, both formatted as hex humbers
 # after optimizations, mostly just copies bits or generates 0's
-# args: ip_hex - ip formatted as a hex number, mask_hex - mask formatted as a hex number, addr_len - address length in bits (32 for ipv4, 128 for ipv6),
+# args: ip_hex - ip formatted as a hex number, mask_hex - mask formatted as a hex number, maskbits - CIDR value,
+# addr_len - address length in bits (32 for ipv4, 128 for ipv6),
 # chunk_len - chunk size in bits used for calculation. seems to perform best with 16 bits for ipv4, 32 bits for ipv6
 bitwise_and() {
 	ip_hex="$1"; mask_hex="$2"; maskbits="$3"; addr_len="$4"; chunk_len="$5"
