@@ -48,4 +48,5 @@ However, only tested with the GNU variants, and only on Linux (works on OpenWRT 
 Probably should work on other Unixes but may need slight modifications.
 
 ## Notes
-If you find any bugs or have a suggestion for code improvement, please let me know.
+- These scripts do not gather any user data and do not send it anywhere. All they do is examine the network configuration on the specific machine they're running on (without making any external connections), do some calculation and report the results back to the user (to you). All that provided that you downloaded the scripts from the official source, which is `https://github.com/blunderful-scripts/subnet-tools`.
+- If you find any bugs or have a suggestion for code improvement, please let me know.
