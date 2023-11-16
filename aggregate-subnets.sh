@@ -8,12 +8,15 @@
 # Designed for easier automated creation of firewall rules, but perhaps someone has a different application for this functionality.
 # Utilizes the trim-subnet.sh script as a library.
 
-# arg 1 is family (inet or inet6)
-# next args are subnets to aggregate. for ipv6, enclose each subnet in double quotes
+# to check a specific family (inet or inet6), run with the '-f <family>' argument
+# if run without the '-f <family>' argument, auto-detects families
+# use the '-d' argument for debug
+# besides the above, all other args are subnets to aggregate
+
 
 #### Initial setup
 
-#debug=true
+#debugmode=true
 export LC_ALL=C
 me=$(basename "$0")
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
@@ -23,11 +26,24 @@ export source_trim_subnet="true"
 # shellcheck disable=SC1091
 . "$script_dir/trim-subnet.sh" || { echo "$me: Error: Can't source '$script_dir/trim-subnet.sh'." >&2; exit 1; }
 
+## Simple args parsing
+args=""
+for arg in "$@"; do
+	if [ "$arg" = "-d" ]; then debugmode="true"
+	elif [ "$arg" = "-f" ]; then family_arg="check"
+	elif [ "$family_arg" = "check" ]; then family_arg="$arg"
+	else args="$args $arg"
+	fi
+done
+[ "$family_arg" = "check" ] && { echo "Specify family with '-f'."; exit 1; }
+
+set -- "$args"
+
 
 #### Functions
 
 aggregate_subnets() {
-	family="$1"; input_subnets="$2"
+	family="$1"; input_subnets="$2"; subnets_hex=""; res_subnets=""
 
 	case "$family" in
 		inet ) addr_len=32; chunk_len=16; addr_regex="$ipv4_regex" ;;
@@ -68,8 +84,8 @@ aggregate_subnets() {
 
 		# get the subnet
 		subnet1="$(printf "%s" "$sorted_subnets_hex" | head -n 1)"
-		[ "$debug" ] && echo >&2
-		[ "$debug" ] && echo "processing subnet: $subnet1" >&2
+		[ "$debugmode" ] && echo >&2
+		[ "$debugmode" ] && echo "processing subnet: $subnet1" >&2
 
 		# get mask bits
 		maskbits="${subnet1%/*}"
@@ -84,7 +100,7 @@ aggregate_subnets() {
 		# shellcheck disable=SC2086
 		# calculate ip & mask
 		ip1="$(bitwise_and "$ip" "$mask" "$maskbits" $addr_len $chunk_len)" || return 1
-		[ "$debug" ] && echo "calculated '$ip' & '$mask' = '$ip1'" >&2
+		[ "$debugmode" ] && echo "calculated '$ip' & '$mask' = '$ip1'" >&2
 
 		# remove current subnet from the list
 		sorted_subnets_hex="$(printf "%s" "$sorted_subnets_hex" | tail -n +2)"
@@ -93,7 +109,7 @@ aggregate_subnets() {
 		# iterate over all remaining subnets
 		while [ -n "$remaining_subnets_hex" ]; do
 			subnet2_hex=$(printf "%s" "$remaining_subnets_hex" | head -n 1)
-			[ "$debug" ] && echo "comparing to subnet: '$subnet2_hex'" >&2
+			[ "$debugmode" ] && echo "comparing to subnet: '$subnet2_hex'" >&2
 
 			if [ -n "$subnet2_hex" ]; then
 				# chop off mask bits
@@ -111,13 +127,13 @@ aggregate_subnets() {
 					ip1_chunk="$(printf "%s" "$ip1" | cut -c${chunk_start}-${chunk_end} )"
 					ip2_chunk="$(printf "%s" "$ip2" | cut -c${chunk_start}-${chunk_end} )"
 
-					[ "$debug" ] && echo "comparing chunks '$ip1_chunk' - '$ip2_chunk'" >&2
+					[ "$debugmode" ] && echo "comparing chunks '$ip1_chunk' - '$ip2_chunk'" >&2
 
 					bytes_diff=$((0x$ip1_chunk - 0x$ip2_chunk)) || \
 								{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'." >&2; return 1; }
 					# if there is any difference, no need to calculate further
 					if [ $bytes_diff -ne 0 ]; then
-						[ "$debug" ] && echo "difference found" >&2
+						[ "$debugmode" ] && echo "difference found" >&2
 						ip2_differs=true; break
 					fi
 
@@ -128,7 +144,7 @@ aggregate_subnets() {
 				# shellcheck disable=SC2086
 				# if needed, calculate the next ip2 chunk and compare to ip1 chunk
 				if [ $bits_processed -ne $maskbits ] && [ -z  "$ip2_differs" ]; then
-					[ "$debug" ] && echo "calculating last chunk..." >&2
+					[ "$debugmode" ] && echo "calculating last chunk..." >&2
 					chunk_start=$((char_offset + 1))
 					chunk_end=$((char_offset + char_num))
 
@@ -140,19 +156,19 @@ aggregate_subnets() {
 					ip2_chunk=$(printf "%0${char_num}x" $(( 0x$ip2_chunk & 0x$mask_chunk )) ) || \
 						{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'."; return 1; }
 
-					[ "$debug" ] && echo "comparing chunks '$ip1_chunk' - '$ip2_chunk'" >&2
+					[ "$debugmode" ] && echo "comparing chunks '$ip1_chunk' - '$ip2_chunk'" >&2
 
 					bytes_diff=$((0x$ip1_chunk - 0x$ip2_chunk)) || \
 								{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'." >&2; return 1; }
 					if [ $bytes_diff -ne 0 ]; then
-						[ "$debug" ] && echo "difference found" >&2
+						[ "$debugmode" ] && echo "difference found" >&2
 						ip2_differs=true
 					fi
 				fi
 
 				# if no differences found, subnet2 is encapsulated in subnet1 - remove subnet2 from the list
 				if [ -z "$ip2_differs" ]; then
-					[ "$debug" ] && echo "No difference found" >&2
+					[ "$debugmode" ] && echo "No difference found" >&2
 					sorted_subnets_hex="$(printf "%s\n" "$sorted_subnets_hex" | grep -vx "$subnet2_hex")"
 				fi
 			fi
@@ -171,7 +187,7 @@ aggregate_subnets() {
 		fi
 	done
 
-	printf "%s\n" "$res_subnets"
+	printf "%s" "$res_subnets"
 }
 
 
@@ -181,11 +197,9 @@ newline='
 ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
 ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
 maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
-
-# convert to lower case
-family="$(printf "%s" "$1" | awk '{print tolower($0)}')"; shift
-
-[ -z "$family" ] && { echo "$me: Specify family (inet or inet6) in 1st argument." >&2; exit 1; }
+maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
+subnet_regex_ipv4="${ipv4_regex}/${maskbits_regex_ipv4}"
+subnet_regex_ipv6="${ipv6_regex}/${maskbits_regex_ipv6}"
 
 
 #### Main
@@ -203,6 +217,49 @@ rv=$((rv1 || ! rv2))
 [ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly on this machine." >&2; exit 1; }
 unset rv rv1 rv2
 
-test_ip_route_get "$family" || exit 1
+# convert to lower case
+[ -n "$family_arg" ] && family_arg="$(printf "%s" "$family_arg" | awk '{print tolower($0)}')"
 
-aggregate_subnets "$family" "$*"; exit $?
+case "$family_arg" in
+	inet) families="inet"; subnets_inet="$*" ;;
+	inet6 ) families="inet6"; subnets_inet6="$*" ;;
+	'' ) ;;
+	* ) echo "$me: Error: invalid family '$family_arg'." >&2; exit 1 ;;
+esac
+
+# sort input subnets by family
+if [ -z "$family_arg" ]; then
+	subnets_inet="$(printf "%s" "$*" | tr ' ' '\n' | grep -E "^${subnet_regex_ipv4}$" | tr '\n' ' ')"
+	subnets_inet6="$(printf "%s" "$*" | tr ' ' '\n' | grep -E "^${subnet_regex_ipv6}$" | tr '\n' ' ')"
+
+	# trim extra whitespace
+	subnets_inet="${subnets_inet% }"
+	subnets_inet6="${subnets_inet6% }"
+
+	[ -n "$subnets_inet" ] && families="inet"
+	[ -n "$subnets_inet6" ] && families="$families inet6"
+fi
+
+# check for invalid args
+invalid_args="$*"
+for family in $families; do
+	case "$family" in
+		inet ) invalid_args="$(printf "%s" "$invalid_args" | tr ' ' '\n' | grep -vE "^${subnet_regex_ipv4}$" | tr '\n' ' ')" ;;
+		inet6 ) invalid_args="$(printf "%s" "$invalid_args" | tr ' ' '\n' | grep -vE "^${subnet_regex_ipv6}$" | tr '\n' ' ')"
+	esac
+done
+
+# trim extra whitespaces
+invalid_args="${invalid_args% }"
+invalid_args="${invalid_args# }"
+
+[ -n "$invalid_args" ] && { echo "Error: These do not appear to be valid subnets for families '$families': '$invalid_args'"; exit 1; }
+
+rv_global=0
+for family in $families; do
+	test_ip_route_get "$family" || exit 1
+	[ "$debugmode" ] && eval echo "Aggregating for family \'$family\'."
+	eval aggregate_subnets "$family" \"\$subnets_"$family"\"; rv_global=$((rv_global + $?))
+done
+
+exit $rv_global
