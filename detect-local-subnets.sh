@@ -9,6 +9,7 @@
 # by default, outputs all found local ip addresses, and aggregated subnets
 # to output only aggregated subnets (and no other text), run with the '-s' argument
 # to only check a specific family (inet or inet6), run with the '-f <family>' argument
+# use '-d' argument for debug
 
 export LC_ALL=C
 me=$(basename "$0")
@@ -17,11 +18,13 @@ me=$(basename "$0")
 args=""
 for arg in "$@"; do
 	if [ "$arg" = "-s" ]; then subnets_only="true"
+	elif [ "$arg" = "-d" ]; then export debugmode="true"
 	elif [ "$arg" = "-f" ]; then family_arg="check"
 	elif [ "$family_arg" = "check" ]; then family_arg="$arg"
 	else args="$args $arg"
 	fi
 done
+[ "$family_arg" = "check" ] && { echo "Specify family with '-f'."; exit 1; }
 
 set -- "$args"
 
