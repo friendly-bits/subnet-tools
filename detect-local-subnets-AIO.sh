@@ -224,23 +224,17 @@ test_ip_route_get() {
 	case "$family" in
 		inet ) legal_addr="127.0.0.1"; illegal_addr="127.0.0.256" ;;
 		inet6 ) legal_addr="::1"; illegal_addr=":a:1" ;;
-		* ) echo "test_ip_route_get(): Error: invalid family '$family'" >&2; return 1 ;;
+		* ) echo "test_ip_route_get(): Error: invalid family '$family'" >&2; return 1
 	esac
-	legal_exp_addr="2001:4567:1212:00b2:0000:0000:0000:0000"
-	illegal_exp_addr="2001:4567:1212:00b2:0T00:0000:0000:0000"
-	rv_legal=0; rv_illegal=1; rv_legal_exp=0; rv_illegal_exp=1
+	rv_legal=0; rv_illegal=1
 
 	# test with a legal ip
 	ip route get "$legal_addr" >/dev/null 2>/dev/null; [ $? -ne 0 ] && rv_legal=1
  	# test with an illegal ip
 	ip route get "$illegal_addr" >/dev/null 2>/dev/null; [ $? -ne 1 ] && rv_illegal=0
-	# test with a legal expanded ip
-	ip route get "$legal_exp_addr" >/dev/null 2>/dev/null; rv=$?; if [ $rv -ne 0 ] && [ $rv -ne 2 ]; then rv_legal_exp=1; fi
-	# test with an illegal expanded ip
-	ip route get "$illegal_exp_addr" >/dev/null 2>/dev/null; [ $? -ne 1 ] && rv_illegal_exp=0
 
 	# combine the results
-	rv=$(( rv_legal || rv_legal_exp || ! rv_illegal || ! rv_illegal_exp ))
+	rv=$(( rv_legal || ! rv_illegal ))
 
 	if [ $rv -ne 0 ]; then
 		echo "test_ip_route_get(): Note: command 'ip route get' is not working as expected (or at all) on this device." >&2
@@ -248,7 +242,7 @@ test_ip_route_get() {
 		echo >&2
 		ip_route_get_disable=true
 	fi
-	unset legal_addr illegal_addr legal_exp_addr illegal_exp_addr rv_legal rv_illegal rv_legal_exp rv_illegal_exp
+	unset legal_addr illegal_addr rv_legal rv_illegal
 }
 
 # calculates bitwise ip & mask, both represented as hex humbers, and outputs the result in the same format
