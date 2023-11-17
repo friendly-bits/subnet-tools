@@ -69,7 +69,7 @@ get_local_subnets() (
 		echo
 	}
 
-	local_subnets="$(sh aggregate-subnets.sh "$family" "$local_addresses")"; rv1=$?
+	local_subnets="$(sh aggregate-subnets.sh -f "$family" "$local_addresses")"; rv1=$?
 
 	# removes extra whitespaces, converts to newline-delimited list
 	local_subnets="$(printf "%s" "$local_subnets" | awk '{$1=$1};1' | tr ' ' '\n')"
@@ -78,7 +78,7 @@ get_local_subnets() (
 		[ -z "$subnets_only" ] && echo "Local $family subnets (aggregated):"
 		if [ -n "$local_subnets" ]; then printf "%s\n" "$local_subnets"; else echo "None found."; fi
 	else
-		echo "Error detecting $family subnets." >&2
+		echo "get_local_subnets(): Error detecting $family subnets." >&2
 	fi
 	[ -z "$subnets_only" ] && echo
 
