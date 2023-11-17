@@ -26,6 +26,7 @@ export source_trim_subnet="true"
 # shellcheck disable=SC1091
 . "$script_dir/trim-subnet.sh" || { echo "$me: Error: Can't source '$script_dir/trim-subnet.sh'." >&2; exit 1; }
 
+
 ## Simple args parsing
 args=""
 for arg in "$@"; do
@@ -175,8 +176,8 @@ aggregate_subnets() {
 			remaining_subnets_hex="$(printf "%s" "$remaining_subnets_hex" | tail -n +2)"
 		done
 
-		# format from hex number back to ip
-		ip1="$(format_ip "$ip1" "$family")" || return 1
+		# convert from hex number back to ip
+		ip1="$(hex_to_ip "$ip1" "$family")" || return 1
 		if validate_ip "$ip1" "$addr_regex"; then
 			# append mask bits
 			subnet1="$ip1/$maskbits"
@@ -203,19 +204,6 @@ subnet_regex_ipv6="${ipv6_regex}/${maskbits_regex_ipv6}"
 
 
 #### Main
-
-# check dependencies
-! command -v awk >/dev/null || ! command -v sed >/dev/null || ! command -v tr >/dev/null || \
-! command -v grep >/dev/null || ! command -v ip >/dev/null || ! command -v cut >/dev/null && \
-	{ echo "$me: Error: missing dependencies, can not proceed" >&2; exit 1; }
-
-# test 'grep -E'
-rv=0; rv1=0; rv2=0
-printf "%s" "32" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv1=$?
-printf "%s" "0" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv2=$?
-rv=$((rv1 || ! rv2))
-[ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly on this machine." >&2; exit 1; }
-unset rv rv1 rv2
 
 # convert to lower case
 [ -n "$family_arg" ] && family_arg="$(printf "%s" "$family_arg" | awk '{print tolower($0)}')"
@@ -253,12 +241,12 @@ done
 invalid_args="${invalid_args% }"
 invalid_args="${invalid_args# }"
 
-[ -n "$invalid_args" ] && { echo "Error: These do not appear to be valid subnets for families '$families': '$invalid_args'"; exit 1; }
+[ -n "$invalid_args" ] && { echo "Error: These do not appear to be valid subnets for families '$families': '$invalid_args'" >&2; exit 1; }
 
 rv_global=0
 for family in $families; do
 	test_ip_route_get "$family" || exit 1
-	[ "$debugmode" ] && eval echo "Aggregating for family \'$family\'."
+	[ "$debugmode" ] && eval echo "Aggregating for family \'$family\'." >&2
 	eval aggregate_subnets "$family" \"\$subnets_"$family"\"; rv_global=$((rv_global + $?))
 done
 
