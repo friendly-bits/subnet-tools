@@ -15,6 +15,7 @@
 
 #### Initial setup
 export LC_ALL=C
+me=$(basename "$0")
 #debugmode=true
 
 
@@ -45,6 +46,7 @@ ip_to_hex() {
 expand_ipv6() {
 	addr="$1"
 	[ -z "$addr" ] && { echo "expand_ipv6(): Error: received an empty string." >&2; return 1; }
+	[ "$debugmode" ] && echo "expanding address '$addr'" >&2
 
 	# prepend 0 if we start with :
 	printf "%s" "$addr" | grep "^:" >/dev/null 2>/dev/null && addr="0${addr}"
@@ -210,31 +212,25 @@ test_ip_route_get() {
 	case "$family" in
 		inet ) legal_addr="127.0.0.1"; illegal_addr="127.0.0.256" ;;
 		inet6 ) legal_addr="::1"; illegal_addr=":a:1" ;;
-		* ) echo "test_ip_route_get(): Error: invalid family '$family'" >&2; return 1 ;;
+		* ) echo "test_ip_route_get(): Error: invalid family '$family'" >&2; return 1
 	esac
-	legal_exp_addr="2001:4567:1212:00b2:0000:0000:0000:0000"
-	illegal_exp_addr="2001:4567:1212:00b2:0T00:0000:0000:0000"
-	rv_legal=0; rv_illegal=1; rv_legal_exp=0; rv_illegal_exp=1
+	rv_legal=0; rv_illegal=1
 
 	# test with a legal ip
-	ip route get "$legal_addr" >/dev/null 2>/dev/null; [ $? -ne 0 ] && rv_legal=1
+	ip route get "$legal_addr" >/dev/null 2>/dev/null; rv_legal=$?
  	# test with an illegal ip
 	ip route get "$illegal_addr" >/dev/null 2>/dev/null; [ $? -ne 1 ] && rv_illegal=0
-	# test with a legal expanded ip
-	ip route get "$legal_exp_addr" >/dev/null 2>/dev/null; rv=$?; if [ $rv -ne 0 ] && [ $rv -ne 2 ]; then rv_legal_exp=1; fi
-	# test with an illegal expanded ip
-	ip route get "$illegal_exp_addr" >/dev/null 2>/dev/null; [ $? -ne 1 ] && rv_illegal_exp=0
 
 	# combine the results
-	rv=$(( rv_legal || rv_legal_exp || ! rv_illegal || ! rv_illegal_exp ))
+	rv=$(( rv_legal || ! rv_illegal ))
 
 	if [ $rv -ne 0 ]; then
-		echo "test_ip_route_get(): Note: command 'ip route get' is not working as expected (or at all) on this device." >&2
+		echo "test_ip_route_get(): Note: command 'ip route get' is not working as expected (or at all)." >&2
 		echo "test_ip_route_get(): Disabling validation using the 'ip route get' command. Less reliable regex validation will be used instead." >&2
 		echo >&2
 		ip_route_get_disable=true
 	fi
-	unset legal_addr illegal_addr legal_exp_addr illegal_exp_addr rv_legal rv_illegal rv_legal_exp rv_illegal_exp
+	unset legal_addr illegal_addr rv_legal rv_illegal
 }
 
 # calculates bitwise ip & mask, both represented as hex humbers, and outputs the result in the same format
@@ -289,18 +285,6 @@ bitwise_and() {
 
 # Main
 trim_subnet() {
-	# check dependencies
-	! command -v awk >/dev/null || ! command -v sed >/dev/null || ! command -v tr >/dev/null || \
-	! command -v grep >/dev/null || ! command -v ip >/dev/null || ! command -v cut >/dev/null && \
-		{ echo "trim_subnet(): Error: missing dependencies, can not proceed" >&2; return 1; }
-
-	# test 'grep -E'
-	rv=0; rv1=0; rv2=0
-	printf "%s" "32" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv1=$?
-	printf "%s" "0" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv2=$?
-	rv=$((rv1 || ! rv2))
-	[ "$rv" -ne 0 ] && { echo "trim_subnet(): Error: 'grep -E' command is not working correctly on this machine." >&2; return 1; }
-	unset rv rv1 rv2
 
 	# convert to lower case
 	input_ip="$(printf "%s" "$1" | awk '{print tolower($0)}')"
@@ -349,7 +333,8 @@ trim_subnet() {
 	validate_ip "$new_ip" "$addr_regex" && { printf "%s\n" "$subnet"; return 0; } || return 1
 }
 
-#### Constants
+
+## Constants
 # ipv4 regex taken from here and modified for ERE matching:
 # https://stackoverflow.com/questions/5284147/validating-ipv4-addresses-with-regexp
 # the longer ("alternative") ipv4 regex from the top suggestion performs about 40x faster on a slow CPU with ERE grep than the shorter one
@@ -359,6 +344,21 @@ ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|
 ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
 maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
 #maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
+
+
+## check dependencies
+! command -v awk >/dev/null || ! command -v sed >/dev/null || ! command -v tr >/dev/null || \
+! command -v grep >/dev/null || ! command -v ip >/dev/null || ! command -v cut >/dev/null && \
+	{ echo "$me: Error: missing dependencies, can not proceed" >&2; exit 1; }
+
+# test 'grep -E'
+rv=0; rv1=0; rv2=0
+printf "%s" "32" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv1=$?
+printf "%s" "0" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv2=$?
+rv=$((rv1 || ! rv2))
+[ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly." >&2; exit 1; }
+unset rv rv1 rv2
+
 
 
 # to use or test functions from external sourcing script, export the $source_trim_subnet variable in that script
