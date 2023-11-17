@@ -8,19 +8,15 @@
 # requires ip with mask bits in 1st arg. optional 2nd arg is ip family (inet or inet6).
 # if not specified, auto-detects the ip family.
 
-# this is a modified and (hopefully) improved version of some parts of a script found here:
-# https://github.com/chmduquesne/wg-ip/blob/master/wg-ip
-# also used some input from here:
-# https://stackoverflow.com/questions/14697403/expand-ipv6-address-in-shell-script
-
-# the code is POSIX-compatible
+# the code is POSIX-compliant
 # requires awk, grep with ERE support, sed and some additional standard utilities like tr and cut.
-# only tested with GNU variants, and only on Linux.
+# only tested with GNU variants, and only on Linux. should work on other Unixes.
 
 
 #### Initial setup
 export LC_ALL=C
 #debugmode=true
+
 
 #### Functions
 
@@ -75,7 +71,7 @@ expand_ipv6() {
 
 # returns a compressed ipv6 address in the format recommended by RFC5952
 # for input, expects a fully expanded ipv6 address represented as a hex number (no colons)
-compress_ipv6 () {
+compress_ipv6() {
 	ip=""
 	# add leading colon
 	quads_merged="${1}"
@@ -187,7 +183,7 @@ generate_mask()
 # validates an ipv4 or ipv6 address
 # if 'ip route get' command is working correctly, validates the address through it
 # then performs regex validation
-validate_ip () {
+validate_ip() {
 	addr="$1"; addr_regex="$2"
 	[ -z "$addr" ] && { echo "validate_ip(): Error:- received an empty ip address." >&2; return 1; }
 	[ -z "$addr_regex" ] && { echo "validate_ip: Error: address regex has not been specified." >&2; return 1; }
@@ -365,7 +361,7 @@ maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
 #maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
 
 
-# to test functions from external sourcing script, export the $source_trim_subnet variable in that script
+# to use or test functions from external sourcing script, export the $source_trim_subnet variable in that script
 if [ -z "$source_trim_subnet" ]; then
 	trim_subnet "$1" "$2" || exit 1
 else return 0
