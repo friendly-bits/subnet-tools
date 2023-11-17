@@ -31,7 +31,7 @@ fd16:1234:5678:ab::/64
 fd16:1234:5678:c0::/60`**
 
 ## detect-local-subnets.sh
-Unix shell script which uses standard utilities to detect local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host).
+Unix shell script which uses standard utilities to detect local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host). By default, outputs all found local ip addresses and aggregated subnets these addresses belong to.
 Some heuristics are employed which are likely to work on Linux but for other Unixes, testing is recommended.
 Tested on Debian-based Linux distributions and on OpenWRT.
 
