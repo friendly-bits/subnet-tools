@@ -41,7 +41,7 @@ ip_to_hex() {
 	esac
 }
 
-# expands given ipv6 address into hex number
+# expands given ipv6 address and converts it into a hex number
 expand_ipv6() {
 	addr="$1"
 	[ -z "$addr" ] && { echo "expand_ipv6(): Error: received an empty string." >&2; return 1; }
@@ -237,7 +237,7 @@ test_ip_route_get() {
 	unset legal_addr illegal_addr legal_exp_addr illegal_exp_addr rv_legal rv_illegal rv_legal_exp rv_illegal_exp
 }
 
-# calculates bitwise ip & mask, both formatted as hex humbers
+# calculates bitwise ip & mask, both represented as hex humbers, and outputs the result in the same format
 # arguments:
 # 1: ip_hex - ip formatted as a hex number, 2: mask_hex - mask formatted as a hex number, 3: maskbits - CIDR value,
 # 4: addr_len - address length in bits (32 for ipv4, 128 for ipv6),
