@@ -24,7 +24,7 @@ export LC_ALL=C
 
 #### Functions
 
-# converts given ip address into hex number
+# converts given ipv4 address into hex number
 ip_to_hex() {
 	ip="$1"
 	family="$2"
@@ -74,7 +74,7 @@ expand_ipv6() {
 }
 
 # returns a compressed ipv6 address in the format recommended by RFC5952
-# expects a fully expanded and merged ipv6 address as input (no colons)
+# for input, expects a fully expanded ipv6 address represented as a hex number (no colons)
 compress_ipv6 () {
 	ip=""
 	# add leading colon
@@ -110,12 +110,12 @@ compress_ipv6 () {
 	printf "%s" "$ip"
 }
 
-# formats merged hex number as an ipv4 or ipv6 address
-format_ip() {
+# converts an ip address represented as a hex number into a standard ipv4 or ipv6 address
+hex_to_ip() {
 	ip_hex="$1"
 	family="$2"
-	[ -z "$ip_hex" ] && { echo "format_ip(): Error: received empty value instead of ip_hex." >&2; return 1; }
-	[ -z "$family" ] && { echo "format_ip(): Error: received empty value for ip family." >&2; return 1; }
+	[ -z "$ip_hex" ] && { echo "hex_to_ip(): Error: received empty value instead of ip_hex." >&2; return 1; }
+	[ -z "$family" ] && { echo "hex_to_ip(): Error: received empty value for ip family." >&2; return 1; }
 	case "$family" in
 		inet )
 			# split into 4 octets
@@ -123,7 +123,7 @@ format_ip() {
 			# convert from hex to dec, remove spaces, add delimiting '.'
 			ip=""
 			for octet in $octets; do
-				ip="${ip}$(printf "%d." 0x"$octet")" || { echo "format_ip(): Error: failed to convert octet '0x$octet' to decimal." >&2; return 1; }
+				ip="${ip}$(printf "%d." 0x"$octet")" || { echo "hex_to_ip(): Error: failed to convert octet '0x$octet' to decimal." >&2; return 1; }
 			done
 			# remove trailing '.'
 			ip="${ip%?}"
@@ -136,7 +136,7 @@ format_ip() {
 			printf "%s" "$ip"
 			return 0
 		;;
-		* ) echo "format_ip(): Error: invalid family '$family'" >&2; return 1
+		* ) echo "hex_to_ip(): Error: invalid family '$family'" >&2; return 1
 	esac
 }
 
@@ -241,11 +241,11 @@ test_ip_route_get() {
 	unset legal_addr illegal_addr legal_exp_addr illegal_exp_addr rv_legal rv_illegal rv_legal_exp rv_illegal_exp
 }
 
-# performs bitwise ip address & the mask, both formatted as hex humbers
-# after optimizations, mostly just copies bits or generates 0's
-# args: ip_hex - ip formatted as a hex number, mask_hex - mask formatted as a hex number, maskbits - CIDR value,
-# addr_len - address length in bits (32 for ipv4, 128 for ipv6),
-# chunk_len - chunk size in bits used for calculation. seems to perform best with 16 bits for ipv4, 32 bits for ipv6
+# calculates bitwise ip & mask, both formatted as hex humbers
+# arguments:
+# 1: ip_hex - ip formatted as a hex number, 2: mask_hex - mask formatted as a hex number, 3: maskbits - CIDR value,
+# 4: addr_len - address length in bits (32 for ipv4, 128 for ipv6),
+# 5: chunk_len - chunk size in bits used for calculation. seems to perform best with 16 bits for ipv4, 32 bits for ipv6
 bitwise_and() {
 	ip_hex="$1"; mask_hex="$2"; maskbits="$3"; addr_len="$4"; chunk_len="$5"
 	[ "$debugmode" ] && echo "ip_hex: '$ip_hex', mask_hex: '$mask_hex', maskbits: '$maskbits', addr_len: '$addr_len', chunk_len: '$chunk_len'" >&2
@@ -345,7 +345,7 @@ trim_subnet() {
 
 	# perform bitwise AND on the ip address and the mask
 	newip_hex="$(bitwise_and "$ip_hex" "$mask_hex" "$maskbits" $addr_len $chunk_len)" || return 1
-	new_ip="$(format_ip "$newip_hex" "$family")" || return 1
+	new_ip="$(hex_to_ip "$newip_hex" "$family")" || return 1
 
 	subnet="${new_ip}/$maskbits"
 
