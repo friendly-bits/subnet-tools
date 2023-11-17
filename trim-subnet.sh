@@ -20,7 +20,7 @@ export LC_ALL=C
 
 #### Functions
 
-# converts given ipv4 address into hex number
+# converts given ip address into a hex number
 ip_to_hex() {
 	ip="$1"
 	family="$2"
