@@ -1,5 +1,4 @@
 #!/bin/sh
-# shellcheck disable=SC2181,SC2031,SC2030
 
 # detect-local-subnets-AIO.sh
 
@@ -229,7 +228,7 @@ test_ip_route_get() {
 	rv_legal=0; rv_illegal=1
 
 	# test with a legal ip
-	ip route get "$legal_addr" >/dev/null 2>/dev/null; [ $? -ne 0 ] && rv_legal=1
+	ip route get "$legal_addr" >/dev/null 2>/dev/null; rv_legal=$?
  	# test with an illegal ip
 	ip route get "$illegal_addr" >/dev/null 2>/dev/null; [ $? -ne 1 ] && rv_illegal=0
 
@@ -237,7 +236,7 @@ test_ip_route_get() {
 	rv=$(( rv_legal || ! rv_illegal ))
 
 	if [ $rv -ne 0 ]; then
-		echo "test_ip_route_get(): Note: command 'ip route get' is not working as expected (or at all) on this device." >&2
+		echo "test_ip_route_get(): Note: command 'ip route get' is not working as expected (or at all)." >&2
 		echo "test_ip_route_get(): Disabling validation using the 'ip route get' command. Less reliable regex validation will be used instead." >&2
 		echo >&2
 		ip_route_get_disable=true
@@ -523,7 +522,7 @@ rv=0; rv1=0; rv2=0
 printf "%s" "32" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv1=$?
 printf "%s" "0" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv2=$?
 rv=$((rv1 || ! rv2))
-[ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly on this machine." >&2; exit 1; }
+[ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly." >&2; exit 1; }
 unset rv rv1 rv2
 
 
