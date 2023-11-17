@@ -88,7 +88,6 @@ expand_ipv6() {
 # for input, expects a fully expanded ipv6 address represented as a hex number (no colons)
 compress_ipv6 () {
 	ip=""
-	# add leading colon
 	quads_merged="${1}"
 	[ -z "$quads_merged" ] && { echo "compress_ipv6(): Error: received an empty string." >&2; return 1; }
 
