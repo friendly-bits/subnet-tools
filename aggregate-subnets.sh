@@ -76,7 +76,7 @@ aggregate_subnets() {
 		# convert ip address to hex number
 		subnet_hex="$(ip_to_hex "$subnet" "$family")" || return 1
 		# prepend mask bits
-		subnets_hex="$(printf "%s\n%s" "$maskbits/$subnet_hex" "$subnets_hex")"
+		subnets_hex="$maskbits/$subnet_hex$newline$subnets_hex"
 	done
 
 	# sort by mask bits, remove empty lines if any
@@ -108,10 +108,14 @@ aggregate_subnets() {
 		# remove current subnet from the list
 		sorted_subnets_hex="$(printf "%s" "$sorted_subnets_hex" | tail -n +2)"
 		remaining_subnets_hex="$sorted_subnets_hex"
+		remaining_lines_cnt=$(printf '%s' "$remaining_subnets_hex" | wc -l)
 
+		i=0
+		# shellcheck disable=SC2086
 		# iterate over all remaining subnets
-		while [ -n "$remaining_subnets_hex" ]; do
-			subnet2_hex=$(printf "%s" "$remaining_subnets_hex" | head -n 1)
+		while [ $i -le $remaining_lines_cnt ]; do
+			i=$((i+1))
+			subnet2_hex="$(printf "%s" "$remaining_subnets_hex" | awk "NR==$i")"
 			[ "$debugmode" ] && echo "comparing to subnet: '$subnet2_hex'" >&2
 
 			if [ -n "$subnet2_hex" ]; then
@@ -175,15 +179,12 @@ aggregate_subnets() {
 					sorted_subnets_hex="$(printf "%s\n" "$sorted_subnets_hex" | grep -vx "$subnet2_hex")"
 				fi
 			fi
-			remaining_subnets_hex="$(printf "%s" "$remaining_subnets_hex" | tail -n +2)"
 		done
 
 		# format from hex number back to ip
 		ip1="$(hex_to_ip "$ip1" "$family")" || return 1
-		# append mask bits
-		subnet1="$ip1/$maskbits"
-		# add current subnet to resulting list
-		res_subnets="${subnet1}${newline}${res_subnets}"
+		# append mask bits and add current subnet to resulting list
+		res_subnets="${ip1}/${maskbits}${newline}${res_subnets}"
 	done
 
 	output_ips="$(printf '%s' "$res_subnets" | cut -s -d/ -f1)"
