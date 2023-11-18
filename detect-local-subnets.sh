@@ -31,10 +31,12 @@ set -- "$args"
 
 ## Functions
 
-get_local_subnets() (
 # attempts to find local subnets, requires family in 1st arg
+get_local_subnets() {
 
 	family="$1"
+
+	test_ip_route_get "$family" || return 1
 
 	case "$family" in
 		inet )
@@ -69,21 +71,18 @@ get_local_subnets() (
 		echo
 	}
 
-	local_subnets="$(sh aggregate-subnets.sh -f "$family" "$local_addresses")"; rv1=$?
-
-	# removes extra whitespaces, converts to newline-delimited list
-	local_subnets="$(printf "%s" "$local_subnets" | awk '{$1=$1};1' | tr ' ' '\n')"
+	local_subnets="$(aggregate_subnets "$family" "$local_addresses")"; rv1=$?
 
 	if [ $rv1 -eq 0 ]; then
 		[ -z "$subnets_only" ] && echo "Local $family subnets (aggregated):"
 		if [ -n "$local_subnets" ]; then printf "%s\n" "$local_subnets"; else echo "None found."; fi
 	else
-		echo "get_local_subnets(): Error detecting $family subnets." >&2
+		echo "Error detecting $family subnets." >&2
 	fi
 	[ -z "$subnets_only" ] && echo
 
 	return $rv1
-)
+}
 
 
 ## Main
