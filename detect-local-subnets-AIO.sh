@@ -43,8 +43,8 @@ ip_to_hex() {
 	case "$family" in
 		inet )
 			split_ip="$(printf "%s" "$ip" | tr '.' ' ')"
-			for ip in $split_ip; do
-				printf "%02x" "$ip" || { echo "ip_to_hex(): Error: failed to convert ip '$ip' to hex." >&2; return 1; }
+			for octet in $split_ip; do
+				printf "%02x" "$octet" || { echo "ip_to_hex(): Error: failed to convert octet '$octet' to hex." >&2; return 1; }
 			done
 		;;
 		inet6 )
