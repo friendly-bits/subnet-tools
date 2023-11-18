@@ -69,7 +69,7 @@ get_local_subnets() {
 		echo
 	}
 
-	local_subnets="$(aggregate_subnets "$family" "$local_addresses")"; rv1=$?
+	local_subnets="$(sh aggregate-subnets.sh -f "$family" "$local_addresses")"; rv1=$?
 
 	if [ $rv1 -eq 0 ]; then
 		[ -z "$subnets_only" ] && echo "Local $family subnets (aggregated):"
