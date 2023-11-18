@@ -36,8 +36,6 @@ get_local_subnets() {
 
 	family="$1"
 
-	test_ip_route_get "$family" || return 1
-
 	case "$family" in
 		inet )
 			# get local interface names. filters by "scope link" because this should filter out WAN interfaces
