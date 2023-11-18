@@ -199,7 +199,7 @@ generate_mask()
 validate_ip () {
 	addr="$1"; addr_regex="$2"
 	[ -z "$addr" ] && { echo "validate_ip(): Error:- received an empty ip address." >&2; return 1; }
-	[ -z "$addr_regex" ] && { echo "validate_ip: Error: address regex has not been specified." >&2; return 1; }
+	[ -z "$addr_regex" ] && { echo "validate_ip(): Error: address regex has not been specified." >&2; return 1; }
 
 	if [ -z "$ip_route_get_disable" ]; then
 		# using the 'ip route get' command to put the address through kernel's validation
