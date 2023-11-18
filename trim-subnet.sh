@@ -240,7 +240,7 @@ test_ip_route_get() {
 # 5: chunk_len - chunk size in bits used for calculation. seems to perform best with 16 bits for ipv4, 32 bits for ipv6
 bitwise_and() {
 	ip_hex="$1"; mask_hex="$2"; maskbits="$3"; addr_len="$4"; chunk_len="$5"
-	[ "$debugmode" ] && echo "ip_hex: '$ip_hex', mask_hex: '$mask_hex', maskbits: '$maskbits', addr_len: '$addr_len', chunk_len: '$chunk_len'" >&2
+	out_ip=""
 
 	# characters representing each chunk
 	char_num=$((chunk_len / 4))
@@ -253,9 +253,9 @@ bitwise_and() {
 		chunk_end=$((char_offset + char_num))
 
 		ip_chunk="$(printf "%s" "$ip_hex" | cut -c${chunk_start}-${chunk_end} )"
+		out_ip="$out_ip$ip_chunk"
 
-		printf "%s" "$ip_chunk"
-		[ "$debugmode" ] && echo "copied ip chunk: '$ip_chunk'" >&2
+		[ "$debug" ] && echo "copied ip chunk: '$ip_chunk'" >&2
 		bits_processed=$((bits_processed + chunk_len))
 		char_offset=$((char_offset + char_num))
 	done
@@ -270,7 +270,7 @@ bitwise_and() {
 		ip_chunk="$(printf "%s" "$ip_hex" | cut -c${chunk_start}-${chunk_end} )"
 		ip_chunk=$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ) || \
 			{ echo "bitwise_and(): Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; return 1; }
-		printf "%s" "$ip_chunk"
+		out_ip="$out_ip$ip_chunk"
 		[ "$debugmode" ] && echo "calculated ip chunk: '$ip_chunk'" >&2
 		bits_processed=$((bits_processed + chunk_len))
 	fi
@@ -279,7 +279,8 @@ bitwise_and() {
 	# repeat 00 for every missing byte
 	[ "$debugmode" ] && echo "bytes missing: '$bytes_missing'" >&2
 	# shellcheck disable=SC2086,SC2034
-	[ $bytes_missing -gt 0 ] && for b in $(seq 1 $bytes_missing); do printf "%s" '00'; done
+	[ $bytes_missing -gt 0 ] && for b in $(seq 1 $bytes_missing); do out_ip="${out_ip}00"; done
+	printf '%s' "$out_ip"
 	return 0
 }
 
