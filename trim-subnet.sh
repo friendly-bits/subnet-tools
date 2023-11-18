@@ -181,14 +181,13 @@ generate_mask()
 	printf "%s\n" "$mask"
 }
 
-
-# validates an ipv4 or ipv6 address
-# if 'ip route get' command is working correctly, validates the address through it
+# validates an ipv4 or ipv6 address or multiple addresses
+# if 'ip route get' command is working correctly, validates the addresses through it
 # then performs regex validation
-validate_ip() {
+validate_ip () {
 	addr="$1"; addr_regex="$2"
 	[ -z "$addr" ] && { echo "validate_ip(): Error:- received an empty ip address." >&2; return 1; }
-	[ -z "$addr_regex" ] && { echo "validate_ip: Error: address regex has not been specified." >&2; return 1; }
+	[ -z "$addr_regex" ] && { echo "validate_ip(): Error: address regex has not been specified." >&2; return 1; }
 
 	if [ -z "$ip_route_get_disable" ]; then
 		# using the 'ip route get' command to put the address through kernel's validation
@@ -200,9 +199,10 @@ validate_ip() {
 		done
 	fi
 
-	# regex validation
-	printf "%s\n" "$addr" | tr ' ' "\n" | grep -E "^$addr_regex$" > /dev/null || \
-		{ echo "validate_ip(): Error: failed to validate addresses '$addr' with regex." >&2; return 1; }
+	## regex validation
+	# -v inverts grep output to get non-matching lines
+	printf "%s\n" "$addr" | grep -vE "^$addr_regex$" > /dev/null; rv=$?
+	[ $rv -ne 1 ] && { echo "validate_ip(): Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; }
 	return 0
 }
 
