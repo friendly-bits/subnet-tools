@@ -57,21 +57,24 @@ aggregate_subnets() {
 
 	# convert to newline-delimited list, remove duplicates from input, convert to lower case
 	input_subnets="$(printf "%s" "$input_subnets" | tr ' ' '\n' | sort -u | awk '{print tolower($0)}')"
-	input_ips="$(printf '%s' "$input_subnets" | cut -s -d/ -f1)"
+	input_ips="$(printf '%s' "$input_subnets" | cut -s -d/ -f1)" || \
+			{ echo "aggregate_subnets(): Error: failed to process input '$input_subnets'." >&2; return 1; }
 	validate_ip "$input_ips" "$addr_regex" || \
-				{ echo "aggregate_subnets(): Error: failed to validate one or more of input addresses."; return 1; }
+				{ echo "aggregate_subnets(): Error: failed to validate one or more of input addresses." >&2; return 1; }
 	unset input_ips
 
 	for subnet in $input_subnets; do
 		# get mask bits
-		maskbits="$(printf "%s" "$subnet" | cut -s -d/ -f2 )"
-		case "$maskbits" in ''|*[!0-9]*) echo "aggregate_subnets(): Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1;;esac
+		maskbits="$(printf "%s" "$subnet" | cut -s -d/ -f2 )" || \
+				{ echo "aggregate_subnets(): Error: failed to process subnet '$subnet'." >&2; return 1; }
+		case "$maskbits" in ''|*[!0-9]*) echo "aggregate_subnets(): Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1;; esac
 		# chop off mask bits
 		subnet="${subnet%/*}"
 
 		# shellcheck disable=SC2086
 		# validate mask bits
-		if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $addr_len ]; then echo "aggregate_subnets(): Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
+		if [ "$maskbits" -lt 8 ] || [ "$maskbits" -gt $addr_len ]; then
+			echo "aggregate_subnets(): Error: invalid $family mask bits '$maskbits'." >&2; return 1; fi
 
 		# convert ip address to hex number
 		subnet_hex="$(ip_to_hex "$subnet" "$family")" || return 1
@@ -161,7 +164,7 @@ aggregate_subnets() {
 
 					# bitwise $ip2_chunk & $mask_chunk
 					ip2_chunk=$(printf "%0${char_num}x" $(( 0x$ip2_chunk & 0x$mask_chunk )) ) || \
-						{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'."; return 1; }
+						{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'." >&2; return 1; }
 
 					[ "$debugmode" ] && echo "comparing chunks '$ip1_chunk' - '$ip2_chunk'" >&2
 
@@ -176,7 +179,8 @@ aggregate_subnets() {
 				# if no differences found, subnet2 is encapsulated in subnet1 - remove subnet2 from the list
 				if [ -z "$ip2_differs" ]; then
 					[ "$debugmode" ] && echo "No difference found" >&2
-					sorted_subnets_hex="$(printf "%s\n" "$sorted_subnets_hex" | grep -vx "$subnet2_hex")"
+					sorted_subnets_hex="$(printf "%s\n" "$sorted_subnets_hex" | grep -vx "$subnet2_hex")" || \
+					{ [ -n "$sorted_subnets_hex" ] && { echo "aggregate_subnets(): Error: failed to remove '$subnet2_hex' from the list." >&2; return 1; }; }
 				fi
 			fi
 		done
@@ -189,7 +193,7 @@ aggregate_subnets() {
 
 	output_ips="$(printf '%s' "$res_subnets" | cut -s -d/ -f1)"
 	validate_ip "$output_ips" "$addr_regex" || \
-		{ echo "aggregate_subnets(): Error: failed to validate one or more of output addresses."; return 1; }
+		{ echo "aggregate_subnets(): Error: failed to validate one or more of output addresses." >&2; return 1; }
 	printf "%s" "$res_subnets"
 	return 0
 }
