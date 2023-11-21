@@ -24,7 +24,7 @@ for arg in "$@"; do
 	else args="$args $arg"
 	fi
 done
-[ "$family_arg" = "check" ] && { echo "Specify family with '-f'."; exit 1; }
+[ "$family_arg" = "check" ] && { echo "Specify family with '-f'." >&2; exit 1; }
 
 set -- "$args"
 
