@@ -31,8 +31,8 @@ ip_to_hex() {
 	case "$family" in
 		inet )
 			split_ip="$(printf "%s" "$ip" | tr '.' ' ')"
-			for ip in $split_ip; do
-				printf "%02x" "$ip" || { echo "ip_to_hex(): Error: failed to convert ip '$ip' to hex." >&2; return 1; }
+			for octet in $split_ip; do
+				printf "%02x" "$octet" || { echo "ip_to_hex(): Error: failed to convert octet '$octet' to hex." >&2; return 1; }
 			done
 		;;
 		inet6 )
@@ -46,7 +46,6 @@ ip_to_hex() {
 expand_ipv6() {
 	addr="$1"
 	[ -z "$addr" ] && { echo "expand_ipv6(): Error: received an empty string." >&2; return 1; }
-	[ "$debugmode" ] && echo "expanding address '$addr'" >&2
 
 	# prepend 0 if we start with :
 	printf "%s" "$addr" | grep "^:" >/dev/null 2>/dev/null && addr="0${addr}"
@@ -75,27 +74,26 @@ expand_ipv6() {
 # for input, expects a fully expanded ipv6 address represented as a hex number (no colons)
 compress_ipv6() {
 	ip=""
-	# add leading colon
 	quads_merged="${1}"
 	[ -z "$quads_merged" ] && { echo "compress_ipv6(): Error: received an empty string." >&2; return 1; }
 
 	# split into whitespace-separated quads
-	quads="$(printf "%s" "$quads_merged" | sed 's/.\{4\}/& /g')"
+	quads="$(printf "%s" "$quads_merged" | sed 's/.\{4\}/& /g')" || { echo "compress_ipv6(): Error: failed to process input '$quads_merged'." >&2; return 1; }
 	# remove extra leading 0's in each quad, remove whitespaces, add colons
 	for quad in $quads; do
-		ip="${ip}$(printf "%x:" "0x$quad")" || \
-					{ echo "compress_ipv6(): Error: failed to convert quad '0x$quad'." >&2; return 1; }
+		ip="${ip}$(printf "%x:" "0x$quad")" || { echo "compress_ipv6(): Error: failed to convert quad '0x$quad'." >&2; return 1; }
 	done
 
 	# remove trailing colon, add leading colon
-	ip=":${ip%?}"
+	ip=":${ip%:}"
 
 	# compress 0's across neighbor chunks
 	for zero_chain in ":0:0:0:0:0:0:0:0" ":0:0:0:0:0:0:0" ":0:0:0:0:0:0" ":0:0:0:0:0" ":0:0:0:0" ":0:0:0" ":0:0"
 	do
 		case "$ip" in
 			*$zero_chain* )
-				ip="$(printf "%s" "$ip" | sed -e "s/$zero_chain/::/" -e 's/:::/::/')"
+				ip="$(printf "%s" "$ip" | sed -e "s/$zero_chain/::/" -e 's/:::/::/')" || \
+					{ echo "compress_ipv6(): Error: failed to process input '$quads_merged'." >&2; return 1; }
 				break
 		esac
 	done
@@ -117,14 +115,14 @@ hex_to_ip() {
 	case "$family" in
 		inet )
 			# split into 4 octets
-			octets="$(printf "%s" "$ip_hex" | sed 's/.\{2\}/&\ /g')"
+			octets="$(printf "%s" "$ip_hex" | sed 's/.\{2\}/&\ /g')" || { echo "hex_to_ip(): Error: failed to process input '$ip_hex'." >&2; return 1; }
 			# convert from hex to dec, remove spaces, add delimiting '.'
 			ip=""
 			for octet in $octets; do
 				ip="${ip}$(printf "%d." 0x"$octet")" || { echo "hex_to_ip(): Error: failed to convert octet '0x$octet' to decimal." >&2; return 1; }
 			done
 			# remove trailing '.'
-			ip="${ip%?}"
+			ip="${ip%\.}"
 			printf "%s" "$ip"
 			return 0
 		;;
@@ -169,7 +167,7 @@ generate_mask()
 			cur=$((cur / 2))
 			i=$((i + 1))
 		done
-		mask="$mask$(printf "%02x" $sum)"
+		mask="$mask$(printf "%02x" $sum)" || { echo "generate_mask(): Error: to convert byte '$sum' to hex." >&2; return 1; }
 		bytes_done=$((bytes_done + 1))
 
 		while [ $bytes_done -lt $mask_bytes ]; do
@@ -178,8 +176,9 @@ generate_mask()
 		done
 	fi
 
-	printf "%s\n" "$mask"
+	printf "%s" "$mask"
 }
+
 
 # validates an ipv4 or ipv6 address or multiple addresses
 # if 'ip route get' command is working correctly, validates the addresses through it
@@ -269,7 +268,7 @@ bitwise_and() {
 		mask_chunk="$(printf "%s" "$mask_hex" | cut -c${chunk_start}-${chunk_end} )"
 		ip_chunk="$(printf "%s" "$ip_hex" | cut -c${chunk_start}-${chunk_end} )"
 		ip_chunk=$(printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ) || \
-			{ echo "bitwise_and(): Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'."; return 1; }
+			{ echo "bitwise_and(): Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'." >&2; return 1; }
 		out_ip="$out_ip$ip_chunk"
 		[ "$debugmode" ] && echo "calculated ip chunk: '$ip_chunk'" >&2
 		bits_processed=$((bits_processed + chunk_len))
