@@ -15,69 +15,79 @@ export LC_ALL=C
 me=$(basename "$0")
 
 ## Simple args parsing
-args=""
+args=''; debugmode=''
 for arg in "$@"; do
-	if [ "$arg" = "-s" ]; then subnets_only="true"
-	elif [ "$arg" = "-d" ]; then export debugmode="true"
-	elif [ "$arg" = "-f" ]; then family_arg="check"
-	elif [ "$family_arg" = "check" ]; then family_arg="$arg"
-	else args="$args $arg"
-	fi
+	case "$arg" in
+		-s ) subnets_only="true" ;;
+		-d ) export debugmode="true" ;;
+		-f ) families_arg="check" ;;
+		* ) case "$families_arg" in check) families_arg="$arg" ;; *) args="$args $arg"; esac
+	esac
 done
-[ "$family_arg" = "check" ] && { echo "Specify family with '-f'." >&2; exit 1; }
+[ "$families_arg" = "check" ] && { echo "Specify family with '-f'." >&2; exit 1; }
 
 set -- "$args"
 
 
 ## Functions
 
-# attempts to find local subnets, requires family in 1st arg
+# finds local subnets
+# 1 - family
 get_local_subnets() {
-
 	family="$1"
-
 	case "$family" in
 		inet )
 			# get local interface names. filters by "scope link" because this should filter out WAN interfaces
-			local_ifaces_ipv4="$(ip -f inet route show table local scope link | grep -i -v ' lo ' | \
+			local_ifaces_ipv4="$(ip -f inet route show table local scope link | grep -i -v ' lo ' |
 				awk '{for(i=1; i<=NF; i++) if($i~/^dev$/) print $(i+1)}' | sort -u)"
+			case "$local_ifaces_ipv4" in '')
+				echo "get_local_subnets(): Error detecting LAN network interfaces for ipv4." >&2; return 1
+			esac
 
 			# get ipv4 addresses with mask bits, corresponding to local interfaces
 			# awk prints the next string after 'inet'
-			# grep validates the string as ipv4 address with mask bits
+			# then validates the string as ipv4 address with mask bits
 			local_addresses="$(
 				for iface in $local_ifaces_ipv4; do
-					ip -o -f inet addr show "$iface" | \
-					awk '{for(i=1; i<=NF; i++) if($i~/^inet$/) print $(i+1)}' | grep -E "^$subnet_regex_ipv4$"
+					ip -o -f inet addr show "$iface" |
+						awk '{for(i=1; i<=NF; i++) if($i~/^inet$/ && $(i+1)~'"/^$subnet_regex_ipv4$/"') print $(i+1)}'
 				done
 			)"
 		;;
 		inet6 )
 			# get local ipv6 addresses with mask bits
-			# awk prints the next string after 'inet6'
-			# 1st grep filters for ULA (unique local addresses with prefix 'fdxx') and link-nocal addresses (fe80::)
-			# 2nd grep validates the string as ipv6 address with mask bits
-			local_addresses="$(ip -o -f inet6 addr show | awk '{for(i=1; i<=NF; i++) if($i~/^inet6$/) print $(i+1)}' | \
-				grep -E -i '^fd[0-9a-f]{0,2}:|^fe80:' | grep -E -i "^$subnet_regex_ipv6$")"
+			# awk prints the next string after 'inet6', then filters for ULA (unique local addresses with prefix 'fdxx')
+			# and link-nocal addresses (fe80::)
+			# then validates the string as ipv6 address with mask bits
+			local_addresses="$(ip -o -f inet6 addr show |
+				awk '{for(i=1; i<=NF; i++) if($i~/^inet6$/ && $(i+1)~/^fd[0-9a-f]{0,2}:|^fe80:/ && $(i+1)~'"\
+					/^$subnet_regex_ipv6$/"') print $(i+1)}' )"
 		;;
-		* ) echo "get_local_subnets(): invalid family '$family'." >&2; return 1 ;;
+		* ) echo "get_local_subnets: invalid family '$family'." >&2; return 1 ;;
 	esac
 
-	[ -z "$subnets_only" ] && {
+	case "$local_addresses" in '')
+		echo "get_local_subnets(): Error detecting local addresses for family $family." >&2; return 1
+	esac
+
+	case "$subnets_only" in '')
 		echo "Local $family addresses:"
 		echo "$local_addresses"
 		echo
-	}
+	esac
 
 	local_subnets="$(sh aggregate-subnets.sh -f "$family" "$local_addresses")"; rv1=$?
 
-	if [ $rv1 -eq 0 ]; then
-		[ -z "$subnets_only" ] && echo "Local $family subnets (aggregated):"
-		if [ -n "$local_subnets" ]; then printf "%s\n" "$local_subnets"; else echo "None found."; fi
-	else
-		echo "Error detecting $family subnets." >&2
-	fi
-	[ -z "$subnets_only" ] && echo
+	case $rv1 in
+		0) [ -z "$subnets_only" ] && echo "Local $family subnets (aggregated):"
+			case "$local_subnets" in
+				'') [ -z "$subnets_only" ] && echo "None found." ;;
+				*) printf "%s\n" "$local_subnets"
+			esac
+		;;
+		*) echo "Error detecting $family subnets." >&2
+	esac
+	case "$subnets_only" in '') echo; esac
 
 	return $rv1
 }
@@ -89,10 +99,10 @@ ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|
 ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
 maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
 maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
-subnet_regex_ipv4="${ipv4_regex}/${maskbits_regex_ipv4}"
-subnet_regex_ipv6="${ipv6_regex}/${maskbits_regex_ipv6}"
+subnet_regex_ipv4="${ipv4_regex}\/${maskbits_regex_ipv4}"
+subnet_regex_ipv6="${ipv6_regex}\/${maskbits_regex_ipv6}"
 
-[ -n "$family_arg" ] && family_arg="$(printf '%s' "$family_arg" | awk '{print tolower($0)}')"
+[ -n "$family_arg" ] && family_arg="$(printf '%s' "$family_arg" | tr 'A-Z' 'a-z')"
 case "$family_arg" in
 	inet|inet6 ) families="$family_arg" ;;
 	'' ) families="inet inet6" ;;
