@@ -17,18 +17,16 @@ export LC_ALL=C
 me=$(basename "$0")
 
 ## Simple args parsing
-args=''; debugmode=''
+debugmode=''
 for arg in "$@"; do
 	case "$arg" in
 		-s ) subnets_only="true" ;;
 		-d ) debugmode="true" ;;
 		-f ) families_arg="check" ;;
-		* ) case "$families_arg" in check) families_arg="$arg" ;; *) args="$args $arg"; esac
+		* ) case "$families_arg" in check) families_arg="$arg"; esac
 	esac
 done
 [ "$families_arg" = "check" ] && { echo "Specify family with '-f'." >&2; exit 1; }
-
-set -- "$args"
 
 
 ## Functions
@@ -37,27 +35,21 @@ debugprint() {
 	case "$debugmode" in '') ;; *) printf '%s\n' "$1" >&2; esac
 }
 
+# outputs N-th element from input
 # 1 - input string
-# 2 - start char pos.
-# 3 - end char pos.
-substring() {
-	printf '%.*s' $(($3 - $2 + 1)) "${1#"$(printf '%.*s' $(($2 - 1)) "$1")"}"
-}
-
-# outputs N-th line from input
-# 1 - input lines
-# 2 - line num. (1-based)
-# 3 - var name for output
-get_nth_line() {
-	in_lines="$1"; line_ind="$2"; out_var="$3"
-	IFS_OLD="$IFS"; IFS="$newline"; set -f
+# 2 - element num. (1-based)
+# 3 - delimiter
+# 4 - var name for output
+get_nth_el() {
+	line_ind="$2"; __out_var="$4"
+	__IFS_OLD="$IFS"; IFS="$3"; set -f
 	# shellcheck disable=SC2086
-	set -- $in_lines
-	IFS="$IFS_OLD"; set +f
-	eval "$out_var=\"\$$line_ind\""
+	set -- $1
+	IFS="$__IFS_OLD"; set +f
+	eval "$__out_var=\"\$$line_ind\""
 }
 
-# generates a mask represented as a hex number
+# generates a mask represented as a whitespace-separated chunks of hex number
 # 1 - CIDR bits
 # 2 - address length in bits
 generate_mask() {
@@ -75,6 +67,7 @@ generate_mask() {
 	frac=$((maskbits % 8))
 	while true; do
 		case "$octets" in 0) break; esac
+		case $((bytes_done!=0 && bytes_done%chunk_len_bytes==0)) in 1) printf '%s' "$delim"; esac
 		printf '%s' "ff"
 		octets=$((octets - 1))
 		bytes_done=$((bytes_done + 1))
@@ -87,11 +80,13 @@ generate_mask() {
 			cur=$((cur / 2))
 			i=$((i + 1))
 		done
+		case "$((bytes_done%chunk_len_bytes))" in 0) printf '%s' "$delim"; esac
 		printf "%02x" "$sum" || { echo "generate_mask: Error: failed to convert byte '$sum' to hex." >&2; return 1; }
 		bytes_done=$((bytes_done + 1))
 
 		while true; do
 			case "$bytes_done" in "$mask_bytes") break; esac
+			case "$((bytes_done%chunk_len_bytes))" in 0) printf '%s' "$delim"; esac
 			printf '%s' "00"
 			bytes_done=$((bytes_done + 1))
 		done
@@ -152,13 +147,19 @@ test_ip_route_get() {
 	esac
 }
 
+# outpus whitespace-separated hex chunks
 # 1 - ip
 # 2 - family
 ip_to_hex() {
 	convert_ip() {
 		IFS="$4"
-		for chunk in $ip; do
-			printf "%0${2}x" "$3$chunk" || { echo "ip_to_hex(): Error: failed to convert chunk '0x$chunk'." >&2; return 1; }
+		chunks_done=0
+		source_chunk_len_bytes=$(($2/2))
+		for source_chunk in $ip; do
+			case $((chunks_done!=0 && chunks_done*source_chunk_len_bytes%chunk_len_bytes==0)) in 1) printf '%s' "$delim"; esac
+			printf "%0${2}x" "$3$source_chunk" ||
+				{ echo "ip_to_hex(): Error: failed to convert chunk '0x$source_chunk'." >&2; return 1; }
+			chunks_done=$((chunks_done+1))
 		done
 	}
 
@@ -184,7 +185,7 @@ ip_to_hex() {
 				ip="${ip%%::*}$expanded_zeroes${ip#*::}"
 			esac
 
-			# remove colons, pad with 0's and merge
+			# convert to hex chunks
 			convert_ip "$ip" "4" "0x" ':'
 	esac
 }
@@ -194,15 +195,15 @@ ip_to_hex() {
 # 3 - var name for output
 hex_to_ip() {
 	convert_hex() {
-		chunks=$(
+		IFS_OLD="$IFS"; IFS="$delim"
+		for chunk in $hex; do
 			while true; do
-				case "$hex" in '') break; esac
-				printf '%.*s ' "${#3}" "$hex"
-				hex="${hex#$3}"
+				case "$chunk" in '') break; esac
+				printf '%.*s\n' "${#3}" "$chunk"
+				chunk="${chunk#$3}"
 			done
-		)
-		for chunk in $chunks; do
-			printf "%$2" "0x$chunk" ||
+		done |
+		while IFS="$IFS_OLD" read -r chunk; do	printf "%$2" "0x$chunk" ||
 				{ echo "hex_to_ip(): Error: failed to convert chunk '0x$chunk'." >&2; return 1; }
 		done
 	}
@@ -241,16 +242,16 @@ hex_to_ip() {
 # 1- family
 # 2 - whitespace-separated list of subnets
 aggregate_subnets() {
-	family="$1"; input_subnets="$2"; subnets_hex=''; res_subnets=''; res_ips=''
+	family="$1"; input_subnets="$2"; res_subnets=''; res_ips=''
 
 	case "$family" in
-		inet ) addr_len=32; chunk_len=16; addr_regex="$ipv4_regex" ;;
-		inet6 ) addr_len=128; chunk_len=32; addr_regex="$ipv6_regex" ;;
+		inet ) addr_len=32; chunk_len_bits=16; addr_regex="$ipv4_regex" ;;
+		inet6 ) addr_len=128; chunk_len_bits=32; addr_regex="$ipv6_regex" ;;
 		* ) echo "aggregate_subnets: invalid family '$family'." >&2; return 1
 	esac
 
-	# characters representing each chunk
-	char_num=$((chunk_len / 4))
+	chunk_len_bytes=$((chunk_len_bits / 8))
+	chunk_len_chars=$((chunk_len_bytes*2))
 
 	# convert to newline-delimited list, remove duplicates from input, convert to lower case
 	input_subnets="$(printf "%s" "$input_subnets" | tr ' ' '\n' | sort -u | tr 'A-Z' 'a-z')"
@@ -262,43 +263,42 @@ aggregate_subnets() {
 		{ echo "aggregate_subnets(): Error: failed to validate one or more of input addresses." >&2; return 1; }
 	unset input_ips
 
-	for subnet in $input_subnets; do
-		case "$subnet" in */*) ;; *) echo "aggregate_subnets: Error: '$subnet' is not a valid subnet." >&2; return 1; esac
-		# get mask bits
-		maskbits="${subnet#*/}"
-		case "$maskbits" in ''|*[!0-9]*)
-			echo "aggregate_subnets: Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1
-		esac
-		# chop off mask bits
-		subnet="${subnet%%/*}"
+	# convert to hex, prepend mask bits, sort by mask bits
+	sorted_subnets_hex=$(
+		for subnet in $input_subnets; do
+			case "$subnet" in */*) ;; *) echo "aggregate_subnets: Error: '$subnet' is not a valid subnet." >&2; return 1; esac
+			# get mask bits
+			maskbits="${subnet#*/}"
+			case "$maskbits" in ''|*[!0-9]*)
+				echo "aggregate_subnets: Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1
+			esac
+			# chop off mask bits
+			subnet="${subnet%%/*}"
 
-		# validate mask bits
-		case $(( (maskbits<8) | (maskbits>addr_len)  )) in 1)
-			echo "aggregate_subnets(): Error: invalid $family mask bits '$maskbits'." >&2; return 1
-		esac
+			# validate mask bits
+			case $(( (maskbits<8) | (maskbits>addr_len) )) in 1)
+				echo "aggregate_subnets(): Error: invalid $family mask bits '$maskbits'." >&2; return 1
+			esac
 
-		# convert ip address to hex number
-		subnet_hex="$(ip_to_hex "$subnet" "$family")"
+			printf '%s' "$maskbits/"
+			ip_to_hex "$subnet" "$family"
+			printf '\n'
+		done | sort -n
+	)
 
-		# prepend mask bits
-		subnets_hex="$maskbits/$subnet_hex$newline$subnets_hex"
-	done
-
-	# sort by mask bits
-	sorted_subnets_hex="$(printf "%s" "$subnets_hex" | sort -n)"
 	while true; do
 		case "$sorted_subnets_hex" in '') break; esac
 
 		## trim the 1st (largest) subnet on the list to its mask bits
 
 		# get first subnet from the list
-		get_nth_line "$sorted_subnets_hex" 1 subnet1
-#		debugprint "processing subnet: $subnet1"
+		get_nth_el "$sorted_subnets_hex" 1 "$newline" subnet1_hex
+#		debugprint "processing subnet: $subnet1_hex"
 
 		# get mask bits
-		maskbits="${subnet1%/*}"
+		maskbits="${subnet1_hex%/*}"
 		# chop off mask bits
-		ip="${subnet1#*/}"
+		ip_hex="${subnet1_hex#*/}"
 
 		# generate mask if it's not been generated yet
 		eval "mask=\"\$mask_${family}_${maskbits}\""
@@ -309,40 +309,38 @@ aggregate_subnets() {
 		
 		# calculate ip & mask
 
-		bits_processed=0; char_offset=0
-		ip1=$(
+		bits_processed=0
+		ip1_hex=$(
 			# copy ~ $maskbits bits
-			while true; do
-				case $((bits_processed + chunk_len > maskbits)) in 1) break; esac
-				chunk_start=$((char_offset + 1))
-				chunk_end=$((char_offset + char_num))
-				substring "$ip" "$chunk_start" "$chunk_end"
-
-				bits_processed=$((bits_processed + chunk_len))
-				char_offset=$((char_offset + char_num))
+			IFS="$delim"
+			for hex_chunk in $ip_hex; do
+				case $((bits_processed + chunk_len_bits > maskbits)) in 1) break; esac
+				case $((bits_processed!=0 && bits_processed%chunk_len_bits==0)) in 1) printf '%s' "$delim"; esac
+				printf '%s' "$hex_chunk"
+				bits_processed=$((bits_processed + chunk_len_bits))
 			done
 			# calculate the next chunk if needed
 			case "$bits_processed" in "$maskbits") ;; *)
-				chunk_start=$((char_offset + 1))
-				chunk_end=$((char_offset + char_num))
+				set -f
+				# shellcheck disable=SC2086
+				set -- $mask; set +f
+				eval "mask_chunk=\"\$$((bits_processed/chunk_len_bits + 1))\""
 
-				mask_chunk="$(substring "$mask" "$chunk_start" "$chunk_end")"
-				ip_chunk="$(substring "$ip" "$chunk_start" "$chunk_end")"
-				printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ||
-					{ echo "aggregate_subnets: Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'." >&2; return 1; }
-				bits_processed=$((bits_processed + chunk_len))
+				case $((bits_processed%chunk_len_bits==0)) in 1) printf '%s' "$delim"; esac
+				printf "%0${chunk_len_chars}x" $(( 0x$hex_chunk & 0x$mask_chunk )) ||
+					{ echo "aggregate_subnets: Error: failed to calculate '0x$hex_chunk & 0x$mask_chunk'." >&2; return 1; }
+				bits_processed=$((bits_processed + chunk_len_bits))
 			esac
 
-			bytes_missing=$(( (addr_len - bits_processed)/8 ))
 			# repeat 00 for every missing byte
-			b=0
 			while true; do
-				case "$b" in "$bytes_missing") break; esac
+				case "$bits_processed" in "$addr_len") break; esac
+				case $((bits_processed%chunk_len_bits==0)) in 1) printf '%s' "$delim"; esac
 				printf '%s' "00"
-				b=$((b+1))
+				bits_processed=$((bits_processed + 8))
 			done
 		)
-#		debugprint "calculated '$ip' & '$mask' = '$ip1'"
+#		debugprint "calculated '$ip_hex' & '$mask' = '$ip1_hex'"
 
 		# remove current subnet from the list
 		IFS_OLD="$IFS"; IFS="$newline"; set -f
@@ -355,7 +353,7 @@ aggregate_subnets() {
 		IFS="$IFS_OLD"; set +f
 
 		# format from hex number back to ip
-		hex_to_ip "$ip1" "$family" "res_ip"
+		hex_to_ip "$ip1_hex" "$family" "res_ip"
 
 		# append mask bits and add current subnet to resulting list
 		res_subnets="${res_subnets}${res_ip}/${maskbits}${newline}"
@@ -367,56 +365,49 @@ aggregate_subnets() {
 		while true; do
 			case "$i" in "$remaining_lines_cnt") break; esac
 			i=$((i+1))
-			get_nth_line "$remaining_subnets_hex" "$i" subnet2_hex
+			get_nth_el "$remaining_subnets_hex" "$i" "$newline" subnet2_hex
 #			debugprint "comparing to subnet: '$subnet2_hex'"
 			# chop off mask bits
-			ip2="${subnet2_hex#*/}"
+			ip2_hex="${subnet2_hex#*/}"
 
-			bytes_diff=0; bits_processed=0; char_offset=0
+			bytes_diff=0; bits_processed=0
 
 			# compare ~ $maskbits bits of ip1 and ip2
-			while true; do
-				case $((bits_processed + chunk_len >= maskbits)) in 1) break; esac
-				chunk_start=$((char_offset + 1))
-				chunk_end=$((char_offset + char_num))
+			IFS_OLD="$IFS"; IFS="$delim"
+			for ip1_hex_chunk in $ip1_hex; do
+				case $((bits_processed + chunk_len_bits >= maskbits)) in 1) break; esac
+				get_nth_el "$ip2_hex" $((bits_processed/chunk_len_bits + 1)) "$delim" ip2_hex_chunk
 
-				ip1_chunk="$(substring "$ip1" "$chunk_start" "$chunk_end")"
-				ip2_chunk="$(substring "$ip2" "$chunk_start" "$chunk_end")"
+#				debugprint "comparing chunks '$ip1_hex_chunk' - '$ip2_hex_chunk'"
 
-#				debugprint "comparing chunks '$ip1_chunk' - '$ip2_chunk'"
-
-				bytes_diff=$((0x$ip1_chunk - 0x$ip2_chunk)) ||
-					{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'." >&2; return 1; }
+				bytes_diff=$((0x$ip1_hex_chunk - 0x$ip2_hex_chunk)) ||
+					{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip1_hex_chunk - 0x$ip2_hex_chunk'." >&2; return 1; }
 				# if there is any difference, no need to calculate further
 				case "$bytes_diff" in 0) ;; *)
 #					debugprint "difference found"
 					break
 				esac
 
-				bits_processed=$((bits_processed + chunk_len))
-				char_offset=$((char_offset + char_num))
+				bits_processed=$((bits_processed + chunk_len_bits))
 			done
+			IFS="$IFS_OLD"
 
 			# if needed, calculate the next ip2 chunk and compare to ip1 chunk
 			case "$bits_processed" in "$maskbits") continue; esac
 			case "$bytes_diff" in 0) ;; *) continue; esac
 
 #			debugprint "calculating last chunk..."
-			chunk_start=$((char_offset + 1))
-			chunk_end=$((char_offset + char_num))
+			get_nth_el "$ip2_hex" $((bits_processed/chunk_len_bits + 1)) "$delim" ip2_hex_chunk
+			get_nth_el "$mask" $((bits_processed/chunk_len_bits + 1)) "$delim" mask_chunk
 
-			ip1_chunk="$(substring "$ip1" "$chunk_start" "$chunk_end")"
-			ip2_chunk="$(substring "$ip2" "$chunk_start" "$chunk_end")"
-			mask_chunk="$(substring "$mask" "$chunk_start" "$chunk_end")"
+			# bitwise $ip2_hex_chunk & $mask_chunk
+			ip2_hex_chunk=$(printf "%0${chunk_len_chars}x" $(( 0x$ip2_hex_chunk & 0x$mask_chunk )) ) ||
+				{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip2_hex_chunk & 0x$mask_chunk'." >&2; return 1; }
 
-			# bitwise $ip2_chunk & $mask_chunk
-			ip2_chunk=$(printf "%0${char_num}x" $(( 0x$ip2_chunk & 0x$mask_chunk )) ) ||
-				{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip2_chunk & 0x$mask_chunk'." >&2; return 1; }
+#			debugprint "comparing chunks '$ip1_hex_chunk' - '$ip2_hex_chunk'"
 
-#			debugprint "comparing chunks '$ip1_chunk' - '$ip2_chunk'"
-
-			bytes_diff=$((0x$ip1_chunk - 0x$ip2_chunk)) ||
-				{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip1_chunk - 0x$ip2_chunk'." >&2; return 1; }
+			bytes_diff=$((0x$ip1_hex_chunk - 0x$ip2_hex_chunk)) ||
+				{ echo "aggregate_subnets(): Error: failed to calculate '0x$ip1_hex_chunk - 0x$ip2_hex_chunk'." >&2; return 1; }
 
 			# if no differences found, subnet2 is encapsulated in subnet1 - remove subnet2 from the list
 			case "$bytes_diff" in 0)
@@ -458,7 +449,7 @@ get_local_subnets() {
 		inet6 )
 			# get local ipv6 addresses with mask bits
 			# awk finds the next string after 'inet6', then filters for ULA (unique local addresses with prefix 'fdxx')
-			# and link-nocal addresses (fe80::)
+			# and link-local addresses (fe80::)
 			# then validates the string as ipv6 address with mask bits
 			local_addresses="$(ip -o -f inet6 addr show |
 				awk '{for(i=1; i<=NF; i++) if($i~/^inet6$/ && $(i+1)~/^fd[0-9a-f]{0,2}:|^fe80:/ && $(i+1)~'"\
@@ -495,10 +486,12 @@ get_local_subnets() {
 ## Constants
 newline='
 '
+# delim="$(printf '\35')"
+delim="#"
 ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
-ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
-maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
+ipv6_regex='([0-9a-f]{0,4})(:[0-9a-f]{0,4}){2,7}'
 maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
+maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
 subnet_regex_ipv4="${ipv4_regex}\/${maskbits_regex_ipv4}"
 subnet_regex_ipv6="${ipv6_regex}\/${maskbits_regex_ipv6}"
 
@@ -515,7 +508,7 @@ rv=0; rv1=0; rv2=0
 printf "%s" "32" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv1=$?
 printf "%s" "0" | grep -E "^${maskbits_regex_ipv4}$" > /dev/null; rv2=$?
 rv=$((rv1 || ! rv2))
-[ "$rv" -ne 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly." >&2; exit 1; }
+[ "$rv" != 0 ] && { echo "$me: Error: 'grep -E' command is not working correctly." >&2; exit 1; }
 unset rv rv1 rv2
 
 
