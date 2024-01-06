@@ -49,7 +49,7 @@ get_nth_el() {
 	eval "$__out_var=\"\$$line_ind\""
 }
 
-# generates a mask represented as a whitespace-separated chunks of hex number
+# generates a mask represented as hex chunks
 # 1 - CIDR bits
 # 2 - address length in bits
 generate_mask() {
@@ -147,7 +147,7 @@ test_ip_route_get() {
 	esac
 }
 
-# outpus whitespace-separated hex chunks
+# converts ip address to hex chunks
 # 1 - ip
 # 2 - family
 ip_to_hex() {
@@ -190,7 +190,7 @@ ip_to_hex() {
 	esac
 }
 
-# 1 - input hex number
+# 1 - input hex chunks
 # 2 - family
 # 3 - var name for output
 hex_to_ip() {
@@ -486,8 +486,7 @@ get_local_subnets() {
 ## Constants
 newline='
 '
-# delim="$(printf '\35')"
-delim="#"
+delim="$(printf '\35')"
 ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
 ipv6_regex='([0-9a-f]{0,4})(:[0-9a-f]{0,4}){2,7}'
 maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
