@@ -347,7 +347,7 @@ trim_subnet() {
 # ipv6 regex taken from the BanIP code and modified for ERE matching
 # https://github.com/openwrt/packages/blob/master/net/banip/files/banip-functions.sh
 ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
-ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
+ipv6_regex='([0-9a-f]{0,4})(:[0-9a-f]{0,4}){2,7}'
 maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
 #maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
 

@@ -57,7 +57,7 @@ get_local_subnets() {
 		inet6 )
 			# get local ipv6 addresses with mask bits
 			# awk prints the next string after 'inet6', then filters for ULA (unique local addresses with prefix 'fdxx')
-			# and link-nocal addresses (fe80::)
+			# and link-local addresses (fe80::)
 			# then validates the string as ipv6 address with mask bits
 			local_addresses="$(ip -o -f inet6 addr show |
 				awk '{for(i=1; i<=NF; i++) if($i~/^inet6$/ && $(i+1)~/^fd[0-9a-f]{0,2}:|^fe80:/ && $(i+1)~'"\
@@ -96,7 +96,7 @@ get_local_subnets() {
 ## Main
 
 ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
-ipv6_regex='([0-9a-f]{0,4}:){1,7}[0-9a-f]{0,4}:?'
+ipv6_regex='([0-9a-f]{0,4})(:[0-9a-f]{0,4}){2,7}'
 maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
 maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
 subnet_regex_ipv4="${ipv4_regex}\/${maskbits_regex_ipv4}"
