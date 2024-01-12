@@ -48,24 +48,23 @@ generate_mask() {
 	# address length (32 bits for ipv4, 128 bits for ipv6)
 	addr_len_bytes="$2"
 
-	bytes_done='' i=0 sum=0 cur=128
+	bytes_done='' i='' sum=0 cur=128
 
 	octets=$((maskbits / 8))
 	frac=$((maskbits % 8))
 	while true; do
-		case "$octets" in 0) break; esac
+		case ${#bytes_done} in "$octets") break; esac
 		case $((${#bytes_done}%chunk_len_bytes==0)) in 1) printf ' 0x'; esac
 		printf '%s' "ff"
-		octets=$((octets - 1))
 		bytes_done="${bytes_done}1"
 	done
 
 	case "${#bytes_done}" in "$addr_len_bytes") ;; *)
 		while true; do
-			case "$i" in "$frac") break; esac
+			case ${#i} in "$frac") break; esac
 			sum=$((sum + cur))
 			cur=$((cur / 2))
-			i=$((i + 1))
+			i="${i}1"
 		done
 		case "$((${#bytes_done}%chunk_len_bytes))" in 0) printf ' 0x'; esac
 		printf "%02x" "$sum" || { echo "generate_mask: Error: failed to convert byte '$sum' to hex." >&2; return 1; }
@@ -134,76 +133,63 @@ test_ip_route_get() {
 	esac
 }
 
-# converts ip address to hex chunks
+# converts ip address to whitespace-separated hex chunks
 # 1 - ip
 # 2 - family
 ip_to_hex() {
-	convert_ip() {
-		IFS="$1"
-		for chunk in $ip; do
-			printf " 0x%0${2}x" "$3$chunk"
-		done
-	}
-
 	ip="$1"; family="$2"
 	case "$family" in
-		inet ) convert_ip "." "2" ;;
+		inet ) chunk_delim='.'; hex_flag='' ;;
 		inet6 )
-			# prepend 0 if we start with :
-			case "$ip" in :*) ip="0${ip}"; esac
-
+			chunk_delim=':'; hex_flag='0x'
 			# expand ::
 			case "$ip" in *::*)
 				exp_zeroes=":0:0:0:0:0:0:0:0:0"
 				ip_tmp="$ip"
 				while true; do
 					case "$ip_tmp" in *:*) ip_tmp="${ip_tmp#*:}";; *) break; esac
-					exp_zeroes="${exp_zeroes%??}"
+					exp_zeroes="${exp_zeroes#:0}"
 				done
 				# replace '::'
-				ip="${ip%%::*}$exp_zeroes${ip#*::}"
+				ip="${ip%::*}$exp_zeroes${ip##*::}"
+				# prepend 0 if we start with :
+				case "$ip" in :*) ip="0${ip}"; esac
 			esac
-			convert_ip ":" "2" "0x"
 	esac
+	IFS="$chunk_delim"
+	for chunk in $ip; do
+		printf " 0x%0${chunk_len_chars}x" "$hex_flag$chunk"
+	done
 }
 
 # 1 - input hex chunks
 # 2 - family
 # 3 - var name for output
 hex_to_ip() {
-	convert_hex() {
-		IFS=' '
-		printf "%$1" $hex || { echo "hex_to_ip(): Error: failed to convert hex to ip." >&2; return 1; }
-	}
+	family="$2"; out_var="$3"
+	ip="$(IFS=' ' printf "%$_fmt_id$_fmt_delim" $1)" ||
+		{ echo "hex_to_ip(): Error: failed to convert hex to ip." >&2; return 1; }
 
-	hex="$1"; family="$2"; out_var="$3"
-	case "$family" in
-		inet )
-			ip="$(convert_hex "d.")" || return 1
-			ip="${ip%.}"
-			;;
-		inet6 )
-			ip="$(convert_hex "x:")" || return 1
-			ip="${ip%:}"
+	case "$family" in inet6 )
+		## compress ipv6
 
-			## compress ipv6
-			case "$ip" in :* ) ;; *) ip=":$ip"; esac
-			# compress 0's across neighbor chunks
-			for zero_chain in ":0:0:0:0:0:0:0:0" ":0:0:0:0:0:0:0" ":0:0:0:0:0:0" ":0:0:0:0:0" ":0:0:0:0" ":0:0:0" ":0:0"; do
-				case "$ip" in
-					*$zero_chain* )
-						ip="${ip%%"$zero_chain"*}::${ip#*"$zero_chain"}"
-						break
-				esac
-			done
-
-			# trim leading colon if it's not a double colon
+		case "$ip" in :* ) ;; *) ip=":$ip"; esac
+		# compress 0's across neighbor chunks
+		for zero_chain in ":0:0:0:0:0:0:0:0" ":0:0:0:0:0:0:0" ":0:0:0:0:0:0" ":0:0:0:0:0" ":0:0:0:0" ":0:0:0" ":0:0"; do
 			case "$ip" in
-				::*) ;;
-				:*) ip="${ip#:}"
+				*$zero_chain* )
+					ip="${ip%%"$zero_chain"*}::${ip#*"$zero_chain"}"
+					break
 			esac
+		done
+
+		# trim leading colon if it's not a double colon
+		case "$ip" in
+			::*) ;;
+			:*) ip="${ip#:}"
+		esac
 	esac
-	eval "$out_var"='$ip'
+	eval "$out_var"='${ip%$_fmt_delim}'
 }
 
 # finds local subnets
@@ -214,8 +200,8 @@ get_local_subnets() {
 	family="$1"; res_subnets=''; res_ips=''
 
 	case "$family" in
-		inet ) addr_len_bits=32; chunk_len_bits=8; addr_regex="$ipv4_regex" ;;
-		inet6 ) addr_len_bits=128; chunk_len_bits=16; addr_regex="$ipv6_regex" ;;
+		inet ) addr_len_bits=32; chunk_len_bits=8; addr_regex="$ipv4_regex"; _fmt_id='d'; _fmt_delim='.' ;;
+		inet6 ) addr_len_bits=128; chunk_len_bits=16; addr_regex="$ipv6_regex"; _fmt_id='x'; _fmt_delim=':' ;;
 		* ) echo "get_local_subnets: invalid family '$family'." >&2; return 1
 	esac
 
