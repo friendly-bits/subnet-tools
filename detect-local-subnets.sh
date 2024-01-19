@@ -9,10 +9,13 @@
 # by default, outputs all found local ip addresses, and aggregated subnets
 # to output only aggregated subnets (and no other text), run with the '-s' argument
 # to only check a specific family (inet or inet6), run with the '-f <family>' argument
-# use '-d' argument for debug
+# '-d' option is for debug
 
 export LC_ALL=C
+set -f
 me=$(basename "$0")
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
+. "$script_dir/ip-regex.sh"
 
 ## Simple args parsing
 args=''; debugmode=''
@@ -20,11 +23,11 @@ for arg in "$@"; do
 	case "$arg" in
 		-s ) subnets_only="true" ;;
 		-d ) export debugmode="true" ;;
-		-f ) families_arg="check" ;;
-		* ) case "$families_arg" in check) families_arg="$arg" ;; *) args="$args $arg"; esac
+		-f ) family_arg="check" ;;
+		* ) case "$family_arg" in check) family_arg="$arg" ;; *) args="$args $arg"; esac
 	esac
 done
-[ "$families_arg" = "check" ] && { echo "Specify family with '-f'." >&2; exit 1; }
+[ "$family_arg" = "check" ] && { echo "Specify family with '-f'." >&2; exit 1; }
 
 set -- "$args"
 
@@ -35,48 +38,25 @@ set -- "$args"
 # 1 - family
 get_local_subnets() {
 	family="$1"
-	case "$family" in
-		inet )
-			# get local interface names. filters by "scope link" because this should filter out WAN interfaces
-			local_ifaces_ipv4="$(ip -f inet route show table local scope link | grep -i -v ' lo ' |
-				awk '{for(i=1; i<=NF; i++) if($i~/^dev$/) print $(i+1)}' | sort -u)"
-			case "$local_ifaces_ipv4" in '')
-				echo "get_local_subnets(): Error detecting LAN network interfaces for ipv4." >&2; return 1
-			esac
-
-			# get ipv4 addresses with mask bits, corresponding to local interfaces
-			# awk prints the next string after 'inet'
-			# then validates the string as ipv4 address with mask bits
-			local_addresses="$(
-				for iface in $local_ifaces_ipv4; do
-					ip -o -f inet addr show "$iface" |
-						awk '{for(i=1; i<=NF; i++) if($i~/^inet$/ && $(i+1)~'"/^$subnet_regex_ipv4$/"') print $(i+1)}'
-				done
-			)"
-		;;
-		inet6 )
-			# get local ipv6 addresses with mask bits
-			# awk prints the next string after 'inet6', then filters for ULA (unique local addresses with prefix 'fdxx')
-			# and link-local addresses (fe80::)
-			# then validates the string as ipv6 address with mask bits
-			local_addresses="$(ip -o -f inet6 addr show |
-				awk '{for(i=1; i<=NF; i++) if($i~/^inet6$/ && $(i+1)~/^fd[0-9a-f]{0,2}:|^fe80:/ && $(i+1)~'"\
-					/^$subnet_regex_ipv6$/"') print $(i+1)}' )"
-		;;
-		* ) echo "get_local_subnets: invalid family '$family'." >&2; return 1 ;;
-	esac
+	local_addresses="$(
+		if [ "$family" = inet ]; then
+			ip -f inet route show table local scope link |
+			grep -v "[[:space:]]lo[[:space:]]" | grep -oE "dev[[:space:]]+[^[:space:]]+" | sed 's/^dev[[:space:]]*//g' | sort -u |
+			while read -r iface; do
+				ip -o -f inet addr show "$iface" | grep -oE "$subnet_regex_ipv4"
+			done
+		else
+			ip -o -f inet6 addr show | grep -oE "(fd[0-9a-f]{0,2}:|fe80:)(([[:alnum:]:/])+)" | grep -oE "^$subnet_regex_ipv6$"
+		fi
+	)"
 
 	case "$local_addresses" in '')
 		echo "get_local_subnets(): Error detecting local addresses for family $family." >&2; return 1
 	esac
 
-	case "$subnets_only" in '')
-		echo "Local $family addresses:"
-		echo "$local_addresses"
-		echo
-	esac
+	case "$subnets_only" in '') printf '%s\n%s\n\n' "Local $family addresses:" "$local_addresses"; esac
 
-	local_subnets="$(sh aggregate-subnets.sh -f "$family" "$local_addresses")"; rv1=$?
+	local_subnets="$(sh "$script_dir/aggregate-subnets.sh" -f "$family" "$local_addresses")"; rv1=$?
 
 	case $rv1 in
 		0) [ -z "$subnets_only" ] && echo "Local $family subnets (aggregated):"
@@ -94,13 +74,6 @@ get_local_subnets() {
 
 
 ## Main
-
-ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
-ipv6_regex='([0-9a-f]{0,4})(:[0-9a-f]{0,4}){2,7}'
-maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
-maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
-subnet_regex_ipv4="${ipv4_regex}\/${maskbits_regex_ipv4}"
-subnet_regex_ipv6="${ipv6_regex}\/${maskbits_regex_ipv6}"
 
 [ -n "$family_arg" ] && family_arg="$(printf '%s' "$family_arg" | tr 'A-Z' 'a-z')"
 case "$family_arg" in
