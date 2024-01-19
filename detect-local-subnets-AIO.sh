@@ -1,6 +1,9 @@
 #!/bin/sh
 # shellcheck disable=SC2154,SC2086,SC2317,SC2018,SC2019
 
+# Copyright: blunderful scripts
+# github.com/blunderful-scripts
+
 # detect-local-subnets-AIO.sh
 
 # Unix shell script which uses standard utilities to detect local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host)
@@ -330,7 +333,7 @@ _nl='
 
 [ "$novalidation" ] || {
 	# check dependencies
-	! checkutil awk || ! checkutil tr || ! checkutil grep || ! checkutil ip &&
+	! checkutil tr || ! checkutil grep || ! checkutil ip &&
 		{ echo "$me: Error: missing dependencies, can not proceed" >&2; exit 1; }
 }
 
