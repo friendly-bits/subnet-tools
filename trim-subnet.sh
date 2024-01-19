@@ -1,6 +1,9 @@
 #!/bin/sh
 # shellcheck disable=SC2154,SC2086,SC2018,SC2019
 
+# Copyright: blunderful scripts
+# github.com/blunderful-scripts
+
 # trim-subnet.sh
 
 # trims an ip to given length (expressed in CIDR mask bits) and outputs the resulting subnet
@@ -9,7 +12,7 @@
 # if not specified, auto-detects the ip family.
 
 # the code is POSIX-compliant
-# requires the 'ip' utility, awk, grep with ERE support and tr.
+# requires the 'ip' utility, grep with ERE support and tr.
 # only tested with GNU variants, and only on Linux. should work on other Unixes.
 
 
