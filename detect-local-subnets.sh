@@ -1,6 +1,9 @@
 #!/bin/sh
 # shellcheck disable=SC2018,SC2019
 
+# Copyright: blunderful scripts
+# github.com/blunderful-scripts
+
 # detect-local-subnets.sh
 
 # Unix shell script which uses standard utilities to detect local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host)
