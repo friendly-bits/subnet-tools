@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC2181,SC2031,SC2030
+# shellcheck disable=SC2154,SC2086,SC2018,SC2019
 
 # trim-subnet.sh
 
@@ -177,10 +177,10 @@ test_ip_route_get() {
 	esac
 }
 
-# calculates bitwise ip & mask, both represented as hex humbers, and outputs the result in the same format
+# calculates bitwise ip & mask, both represented as hex chunks, and outputs the result in the same format
 # arguments:
-# 1 - ip formatted as a hex number
-# 2 - mask formatted as a hex number
+# 1 - ip formatted as a hex chunks
+# 2 - mask formatted as a hex chunks
 # 3 - maskbits
 # 4 - ip length in bits (32 for ipv4, 128 for ipv6),
 # 5 - chunk size in bits used for calculation
