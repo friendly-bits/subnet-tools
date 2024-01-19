@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC2154,SC2034,SC2317,SC2086
+# shellcheck disable=SC2154,SC2317,SC2086,SC2018,SC2019
 
 # aggregate-subnets.sh
 
@@ -31,7 +31,6 @@ source_trim_subnet="true"
 args=''
 for arg in "$@"; do
 	case "$arg" in
-		-s ) subnets_only="true" ;;
 		-d ) export debugmode="true" ;;
 		-f ) family_arg="check" ;;
 		* ) case "$family_arg" in check) family_arg="$arg" ;; *) args="$args $arg"; esac
