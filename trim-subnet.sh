@@ -15,205 +15,138 @@
 
 #### Initial setup
 export LC_ALL=C
+set -f
 me=$(basename "$0")
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 #debugmode=true
+
+. "$script_dir/ip-regex.sh"
 
 
 #### Functions
 
-# 1 - input string
-# 2 - start char pos.
-# 3 - end char pos.
-substring() {
-	printf '%.*s' $(($3 - $2 + 1)) "${1#"$(printf '%.*s' $(($2 - 1)) "$1")"}"
-}
-
 # 1 - ip
 # 2 - family
-# 3 - var name for output
+# 3 - chunk length in bits
 ip_to_hex() {
-	convert_ip() {
-		IFS="$4"
-		for chunk in $ip; do
-			printf "%0${2}x" "$3$chunk" || { echo "ip_to_hex(): Error: failed to convert chunk '0x$chunk'." >&2; return 1; }
-		done
-	}
-
-	ip="$1"; family="$2"; out_var="$3"
-	case "$ip" in '') echo "ip_to_hex: Error: received an empty ip address." >&2; return 1; esac
-
+	ip="$1"; family="$2"; chunk_len_bits="$3"
+	chunk_len_chars=$((chunk_len_bits/4))
 	case "$family" in
-		'') echo "ip_to_hex: Error: received an empty value for ip family." >&2; return 1 ;;
-		inet ) convert_ip "$ip" "2" "" '.' ;;
+		inet ) chunk_delim='.'; hex_flag='' ;;
 		inet6 )
-			expand_ipv6 "$ip" "ip" || { echo "ip_to_hex(): Error: failed to expand ip '$ip'." >&2; return 1; }
-			# remove colons, pad with 0's and merge
-			convert_ip "$ip" "4" "0x" ':'
-			;;
-		* ) echo "ip_to_hex: Error: invalid family '$family'" >&2; return 1 ;;
+			chunk_delim=':'; hex_flag='0x'
+			# expand ::
+			case "$ip" in *::*)
+				zeroes=":0:0:0:0:0:0:0:0:0"
+				ip_tmp="$ip"
+				while true; do
+					case "$ip_tmp" in *:*) ip_tmp="${ip_tmp#*:}";; *) break; esac
+					zeroes="${zeroes#??}"
+				done
+				# replace '::'
+				ip="${ip%::*}$zeroes${ip##*::}"
+				# prepend 0 if we start with :
+				case "$ip" in :*) ip="0${ip}"; esac
+			esac
 	esac
-}
-
-# 1 - ip
-# 2 - var name for output
-expand_ipv6() {
-	ip="$1"; out_var="$2"
-	case "$ip" in '') echo "expand_ipv6: Error: received an empty string." >&2; return 1; esac
-
-	# prepend 0 if we start with :
-	case "$ip" in :*) ip="0${ip}"; esac
-
-	# expand ::
-	case "$ip" in *::*)
-		# count colons
-		colons="$(printf "%s" "$ip" | tr -cd ':')"
-		# repeat :0 for every missing colon
-		i=1; expanded_zeroes=''
-		while true; do
-			case $((i > 9-${#colons})) in 1) break; esac
-			expanded_zeroes="$expanded_zeroes:0"
-			i=$((i+1))
-		done
-		# replace '::'
-		ip="${ip%%::*}$expanded_zeroes${ip#*::}"
-	esac
-	eval "$out_var"='$ip'
-}
-
-# expects a fully expanded ipv6 address for input
-# 1 - ip
-# 2 - var name for output
-compress_ipv6() {
-	ip="$1"; out_var="$2"
-	# add leading colon
-
-	# compress 0's inside each chunk
-	ip="$(IFS=":"
-		for chunk in $ip; do
-			printf '%x:' "0x$chunk"
-		done)"
-	ip=":${ip%:}"
-
-	# compress 0's across neighbor chunks
-	for zero_chain in ":0:0:0:0:0:0:0:0" ":0:0:0:0:0:0:0" ":0:0:0:0:0:0" ":0:0:0:0:0" ":0:0:0:0" ":0:0:0" ":0:0"
-	do
-		case "$ip" in
-			*$zero_chain* )
-				ip="${ip%%"$zero_chain"*}::${ip#*"$zero_chain"}"
-				case "$ip" in *:::* ) ip="${ip%%:::*}::${ip#*:::}"; esac
-				break
-		esac
+	IFS="$chunk_delim"
+	for chunk in $ip; do
+		printf " 0x%0${chunk_len_chars}x" "$hex_flag$chunk"
 	done
-
-	# trim leading colon if it's not a double colon
-	case "$ip" in
-		::*) ;;
-		:*) ip="${ip#:}"
-	esac
-	eval "$out_var"='$ip'
 }
 
-# 1 - input hex number
+# 1 - input hex chunks
 # 2 - family
 # 3 - var name for output
 hex_to_ip() {
-	convert_hex() {
-		chunks=$(
-			while true; do
-				case "$hex" in '') break; esac
-				printf '%.*s ' "${#3}" "$hex"
-				hex="${hex#$3}"
-			done
-		)
-		for chunk in $chunks; do
-			printf "%$2" "0x$chunk" ||
-				{ echo "hex_to_ip: Error: failed to convert chunk '0x$chunk'." >&2; return 1; }
-		done
-	}
+	convert_failed() {  echo "hex_to_ip(): Error: failed to convert hex '$1' to ip." >&2; }
+	family="$2"; out_var="$3"
 
-	hex="$1"; family="$2"; out_var_hex_to_ip="$3"
-	case "$hex" in '') echo "hex_to_ip: Error: received empty value instead of ip_hex." >&2; return 1; esac
 	case "$family" in
-		'') echo "hex_to_ip: Error: received empty value for ip family." >&2; return 1 ;;
-		inet )
-			ip="$(convert_hex "$hex" "d." "??")"
-			ip="${ip%.}"
-			;;
 		inet6 )
-			ip="$(convert_hex "$hex" "x:" "????")"
-			compress_ipv6 "${ip%:}" "ip" || return 1
-		;;
-		* ) echo "hex_to_ip: Error: invalid family '$family'" >&2; return 1
+			_fmt_delim=':'
+			ip="$(IFS=' ' printf "%x:" $1)" || { convert_failed "$1"; return 1; }
+			## compress ipv6
+
+			case "$ip" in :* ) ;; *) ip=":$ip"; esac
+			# compress 0's across neighbor chunks
+			for zeroes in ":0:0:0:0:0:0:0:0" ":0:0:0:0:0:0:0" ":0:0:0:0:0:0" ":0:0:0:0:0" ":0:0:0:0" ":0:0:0" ":0:0"; do
+				case "$ip" in *$zeroes* )
+					ip="${ip%%"$zeroes"*}::${ip#*"$zeroes"}"
+					break
+				esac
+			done
+
+			# trim leading colon if it's not a double colon
+			case "$ip" in
+				::*) ;;
+				:*) ip="${ip#:}"
+			esac
+			;;
+		inet) _fmt_delim='.'; ip="$(IFS=' ' printf "%d." $1)" || { convert_failed "$1"; return 1; }
 	esac
-	eval "$out_var_hex_to_ip"='$ip'
+	eval "$out_var"='${ip%$_fmt_delim}'
 }
 
-# generates a mask represented as a hex number
-# 1 - CIDR bits
-# 2 - address length in bits
+# 1 - mask bits
+# 2 - ip length in bytes
+# 3 - chunk length in bits
 generate_mask() {
-	# CIDR bits
 	maskbits="$1"
+	ip_len_bytes="$2"
+	chunk_len_bytes="$(($3/8))"
 
-	# address length (32 bits for ipv4, 128 bits for ipv6)
-	addr_len="$2"
-
-	mask_bytes=$((addr_len/8))
-
-	bytes_done=0 i=0 sum=0 cur=128
+	bytes_done='' i='' sum=0 cur=128
 
 	octets=$((maskbits / 8))
 	frac=$((maskbits % 8))
 	while true; do
-		case "$octets" in 0) break; esac
-		printf '%s' "ff"
-		octets=$((octets - 1))
-		bytes_done=$((bytes_done + 1))
+		case ${#bytes_done} in "$octets") break; esac
+		case $((${#bytes_done}%chunk_len_bytes==0)) in 1) printf ' 0x'; esac
+		printf %s "ff"
+		bytes_done="${bytes_done}1"
 	done
 
-	case "$bytes_done" in "$mask_bytes") ;; *)
+	case "${#bytes_done}" in "$ip_len_bytes") ;; *)
 		while true; do
-			case "$i" in "$frac") break; esac
+			case ${#i} in "$frac") break; esac
 			sum=$((sum + cur))
 			cur=$((cur / 2))
-			i=$((i + 1))
+			i="${i}1"
 		done
+		case "$((${#bytes_done}%chunk_len_bytes))" in 0) printf ' 0x'; esac
 		printf "%02x" "$sum" || { echo "generate_mask: Error: failed to convert byte '$sum' to hex." >&2; return 1; }
-		bytes_done=$((bytes_done + 1))
+		bytes_done="${bytes_done}1"
 
 		while true; do
-			case "$bytes_done" in "$mask_bytes") break; esac
-			printf '%s' "00"
-			bytes_done=$((bytes_done + 1))
+			case ${#bytes_done} in "$ip_len_bytes") break; esac
+			case "$((${#bytes_done}%chunk_len_bytes))" in 0) printf ' 0x'; esac
+			printf %s "00"
+			bytes_done="${bytes_done}1"
 		done
 	esac
 }
 
 
-# validates an ipv4 or ipv6 address or multiple addresses
-# if 'ip route get' command is working correctly, validates the addresses through it
-# then performs regex validation
-# 1 - ip addresses
+# 1 - ip's
 # 2 - regex
 validate_ip() {
-	addr="$1"; addr_regex="$2"
-	case "$addr" in '') echo "validate_ip: Error: received an empty ip address." >&2; return 1; esac
-	case "$addr_regex" in '') echo "validate_ip: Error: address regex has not been specified." >&2; return 1; esac
+	addr="$1"; ip_regex="$2"
+	[ ! "$addr" ] && { echo "validate_ip: Error: received an empty ip address." >&2; return 1; }
 
 	case "$ip_route_get_disable" in '')
 		# using the 'ip route get' command to put the address through kernel's validation
 		# it normally returns 0 if the ip address is correct and it has a route, 1 if the address is invalid
 		# 2 if validation successful but for some reason it doesn't want to check the route ('permission denied')
 		for address in $addr; do
-			ip route get "$address" >/dev/null 2>/dev/null
-			case $? in 1) echo "validate_ip: Error: ip address'$address' failed kernel validation." >&2; return 1; esac
+			ip route get "$address" 1>/dev/null 2>/dev/null ||
+				{ echo "validate_ip: Error: ip address'$address' failed kernel validation." >&2; return 1; }
 		done
 	esac
 
 	## regex validation
-	# -v inverts grep output to get non-matching lines
-	printf "%s\n" "$addr" | grep -vE "^$addr_regex$" > /dev/null
-	case $? in 1) ;; *) echo "validate_ip: Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; esac
+	printf "%s\n" "$addr" | grep -vE "^$ip_regex$" > /dev/null
+	[ $? != 1 ] && { echo "validate_ip: Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; }
 	return 0
 }
 
@@ -246,115 +179,99 @@ test_ip_route_get() {
 
 # calculates bitwise ip & mask, both represented as hex humbers, and outputs the result in the same format
 # arguments:
-# 1: ip_hex - ip formatted as a hex number, 2: mask_hex - mask formatted as a hex number, 3: maskbits - CIDR value,
-# 4: addr_len - address length in bits (32 for ipv4, 128 for ipv6),
-# 5: chunk_len - chunk size in bits used for calculation. seems to perform best with 16 bits for ipv4, 32 bits for ipv6
+# 1 - ip formatted as a hex number
+# 2 - mask formatted as a hex number
+# 3 - maskbits
+# 4 - ip length in bits (32 for ipv4, 128 for ipv6),
+# 5 - chunk size in bits used for calculation
 bitwise_and() {
-	ip="$1"; mask="$2"; maskbits="$3"; addr_len="$4"; chunk_len="$5"
+	ip="$1"; mask="$2"; maskbits="$3"; ip_len_bytes="$4"; chunk_len_bits="$5"
+	chunk_len_chars=$((chunk_len_bits/4))
 
-	# characters representing each chunk
-	char_num=$((chunk_len / 4))
-
-	bits_processed=0; char_offset=0
+	IFS_OLD="$IFS"; IFS=' '; chunks_done=''; bits_done=0
 	# copy ~ $maskbits bits
-	while true; do
-		case $((bits_processed + chunk_len > maskbits)) in 1) break; esac
-		chunk_start=$((char_offset + 1))
-		chunk_end=$((char_offset + char_num))
-		substring "$ip" "$chunk_start" "$chunk_end"
-
-		bits_processed=$((bits_processed + chunk_len))
-		char_offset=$((char_offset + char_num))
+	for ip_chunk in $ip_hex; do
+		[ $((bits_done + chunk_len_bits < maskbits)) = 0 ] && break
+		printf ' %s' "$ip_chunk"
+		bits_done=$((bits_done + chunk_len_bits))
+		chunks_done="${chunks_done}1"
 	done
 	# calculate the next chunk if needed
-	case "$bits_processed" in "$maskbits") ;; *)
-		chunk_start=$((char_offset + 1))
-		chunk_end=$((char_offset + char_num))
+	[ "$bits_done" != "$maskbits" ] && {
+		set -- $mask
+		chunks_done="${chunks_done}1"
+		eval "mask_chunk=\"\${${#chunks_done}}\""
 
-		mask_chunk="$(substring "$mask" "$chunk_start" "$chunk_end")"
-		ip_chunk="$(substring "$ip" "$chunk_start" "$chunk_end")"
-		printf "%0${char_num}x" $(( 0x$ip_chunk & 0x$mask_chunk )) ||
-			{ echo "bitwise_and: Error: failed to calculate '0x$ip_chunk & 0x$mask_chunk'." >&2; return 1; }
-		bits_processed=$((bits_processed + chunk_len))
-	esac
+		printf " 0x%0${chunk_len_chars}x" $(( ip_chunk & mask_chunk ))
+		bits_done=$((bits_done + chunk_len_bits))
+	}
 
-	bytes_missing=$(( (addr_len - bits_processed)/8 ))
 	# repeat 00 for every missing byte
-	b=0
-	while true; do
-		case "$b" in "$bytes_missing") break; esac
-		printf '%s' "00"
-		b=$((b+1))
+	while [ "$bits_done" != "$ip_len_bits" ]; do
+		[ $((bits_done%chunk_len_bits)) = 0 ] && printf ' 0x'
+		printf %s "00"
+		bits_done=$((bits_done + 8))
 	done
+	IFS="$IFS_OLD"
 }
 
-# Main
+set_family_vars() {
+	case "$family" in
+		'') echo "trim_subnet: Error: failed to detect the family for address '$ip'." >&2; return 1 ;;
+		inet ) ip_len_bits=32; chunk_len_bits=8; ip_regex="$ipv4_regex" ;;
+		inet6 ) ip_len_bits=128; chunk_len_bits=16; ip_regex="$ipv6_regex" ;;
+		* ) echo "trim_subnet: invalid family '$family'." >&2; return 1 ;;
+	esac
+	ip_len_bytes=$((ip_len_bits/8))
+}
 
 trim_subnet() {
 	# convert to lower case
-	input_ip="$(printf "%s" "$1" | tr 'A-Z' 'a-z')"
-	family="$(printf "%s" "$2" | tr 'A-Z' 'a-z')"
+	subnet="$(printf "%s" "$1" | tr 'A-Z' 'a-z')"
+	[ "$2" ] && family="$(printf "%s" "$2" | tr 'A-Z' 'a-z')"
 
-	case "$input_ip" in */*) ;; *) echo "trim_subnet: Error: '$input_ip' is not a valid subnet." >&2; return 1; esac
+	case "$subnet" in */*) ;; *) echo "trim_subnet: Error: '$subnet' is not a valid subnet." >&2; return 1; esac
 	# get mask bits
-	maskbits="${input_ip#*/}"
+	maskbits="${subnet#*/}"
 	case "$maskbits" in ''|*[!0-9]*)
 		echo "trim_subnet: Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1
 	esac
 	# chop off mask bits
-	input_addr="${input_ip%%/*}"
+	ip="${subnet%%/*}"
 
 	# detect the family
 	if [ -z "$family" ]; then
-		printf "%s" "$input_addr" | grep -E "^${ipv4_regex}$" > /dev/null && family="inet"
-		printf "%s" "$input_addr" | grep -E "^${ipv6_regex}$" > /dev/null && family="inet6"
+		printf "%s" "$ip" | grep -E "^${ipv4_regex}$" > /dev/null && family="inet"
+		printf "%s" "$ip" | grep -E "^${ipv6_regex}$" > /dev/null && family="inet6"
 	fi
 
-	case "$family" in
-		'') echo "trim_subnet: Error: failed to detect the family for address '$input_addr'." >&2; return 1 ;;
-		inet ) addr_len=32; chunk_len=16; addr_regex="$ipv4_regex" ;;
-		inet6 ) addr_len=128; chunk_len=32; addr_regex="$ipv6_regex" ;;
-		* ) echo "trim_subnet: invalid family '$family'." >&2; return 1 ;;
-	esac
+	set_family_vars
 
 	# validate mask bits
-	case $(( (maskbits<8) | (maskbits>addr_len)  )) in 1)
+	case $(( (maskbits<8) | (maskbits>ip_len_bits)  )) in 1)
 		echo "trim_subnet: Error: invalid $family mask bits '$maskbits'." >&2; return 1
 	esac
 
 	test_ip_route_get "$family" || return 1
 
-	validate_ip "${input_addr}" "$addr_regex" || return 1
+	validate_ip "$ip" "$ip_regex" || return 1
 
-	# convert ip to hex number
-	ip_hex="$(ip_to_hex "$input_addr" "$family")" || return 1
-	mask_hex="$(generate_mask "$maskbits" $addr_len)" || return 1
+	# convert ip to hex
+	ip_hex="$(ip_to_hex "$ip" "$family" "$chunk_len_bits")" || return 1
+	mask_hex="$(generate_mask "$maskbits" "$ip_len_bytes" "$chunk_len_bits")" || return 1
 
 	# perform bitwise AND on the ip address and the mask
-	newip_hex="$(bitwise_and "$ip_hex" "$mask_hex" "$maskbits" $addr_len $chunk_len)" || return 1
+	newip_hex="$(bitwise_and "$ip_hex" "$mask_hex" "$maskbits" "$ip_len_bytes" "$chunk_len_bits")" || return 1
 	hex_to_ip "$newip_hex" "$family" "new_ip" || return 1
 
 	subnet="$new_ip/$maskbits"
 
-	validate_ip "$new_ip" "$addr_regex" && { printf "%s\n" "$subnet"; return 0; } || return 1
+	validate_ip "$new_ip" "$ip_regex" && { printf "%s\n" "$subnet"; return 0; } || return 1
 }
 
 
-## Constants
-# ipv4 regex taken from here and modified for ERE matching:
-# https://stackoverflow.com/questions/5284147/validating-ipv4-addresses-with-regexp
-# the longer ("alternative") ipv4 regex from the top suggestion performs about 40x faster on a slow CPU with ERE grep than the shorter one
-# ipv6 regex taken from the BanIP code and modified for ERE matching
-# https://github.com/openwrt/packages/blob/master/net/banip/files/banip-functions.sh
-ipv4_regex='((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])\.){3}(25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])'
-ipv6_regex='([0-9a-f]{0,4})(:[0-9a-f]{0,4}){2,7}'
-maskbits_regex_ipv4='(3[0-2]|([1-2][0-9])|[8-9])'
-#maskbits_regex_ipv6='(12[0-8]|((1[0-1]|[1-9])[0-9])|[8-9])'
-
-
 ## check dependencies
-! command -v awk >/dev/null || ! command -v tr >/dev/null ||
-! command -v grep >/dev/null || ! command -v ip >/dev/null &&
+! command -v tr >/dev/null || ! command -v grep >/dev/null || ! command -v ip >/dev/null &&
 	{ echo "$me: Error: missing dependencies, can not proceed" >&2; exit 1; }
 
 # test 'grep -E'
