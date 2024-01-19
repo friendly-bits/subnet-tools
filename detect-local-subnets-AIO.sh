@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC2154,SC2086,SC2317
+# shellcheck disable=SC2154,SC2086,SC2317,SC2018,SC2019
 
 # detect-local-subnets-AIO.sh
 
