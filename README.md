@@ -26,10 +26,13 @@ Output:
 - Input:
 **`sh aggregate-subnets.sh 192.168.1.1/24 192.168.2.2/16 192.169.3.3/16 fd16:1234:5678:ab:1:1:1:1/64 fd16:1234:5678:ab:2:2:2:2/64 fd16:1234:5678:ab::1/128 fd16:1234:5678:cd:9:9:9:9/60`**.
 
-Output: **`192.169.0.0/16
+Output:
+```
 192.168.0.0/16
+192.169.0.0/16
+fd16:1234:5678:c0::/60
 fd16:1234:5678:ab::/64
-fd16:1234:5678:c0::/60`**
+```
 
 ## detect-local-subnets.sh
 Detects local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host). By default, outputs all found local ip addresses and aggregated subnets these addresses belong to.
