@@ -1,6 +1,9 @@
 #!/bin/sh
 # shellcheck disable=SC2154,SC2317,SC2086,SC2018,SC2019
 
+# Copyright: blunderful scripts
+# github.com/blunderful-scripts
+
 # aggregate-subnets.sh
 
 # Posix-compliant shell script which calculates an efficient configuration for subnets given as an input 
