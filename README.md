@@ -8,8 +8,6 @@ Examples:
 - Input: **`sh trim-subnet.sh 192.168.4.111/12`**. Output: **`192.160.0.0/12`**
 - Input: **`sh trim-subnet.sh 2001:4567:1111:56ff::1/42`**. Output: **`2001:4567:1100::/42`**
 
-The auxiliary script _trim-subnet-tests.sh_ tests some functions found in the main script. It's not required for the main script.
-
 ## aggregate-subnets.sh
 Calculates an efficient configuration for subnets given as an input by trimming down each input subnet to its mask bits and removing subnets that are encapsulated inside other subnets on the list. Intended for easier automated creation of firewall rules. Utilizes the above trim-subnet.sh script as a library.
 
