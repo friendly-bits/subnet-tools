@@ -56,7 +56,7 @@ aggregate_subnets() {
 	set_family_vars
 
 	# convert to newline-delimited list, remove duplicates from input, convert to lower case
-	input_subnets="$(printf "%s" "$input_subnets" | tr ' ' '\n' | sort -u | tr 'A-Z' 'a-z')"
+	input_subnets="$(printf %s "$input_subnets" | tr ' ' '\n' | sort -u | tr 'A-Z' 'a-z')"
 	input_ips=''
 	for input_subnet in $input_subnets; do
 		input_ips="$input_ips${input_subnet%%/*}$_nl"
@@ -86,7 +86,7 @@ aggregate_subnets() {
 	done
 
 	# sort by mask bits
-	subnets_hex="$(printf "%s" "$subnets_hex" | sort -n)"
+	subnets_hex="$(printf %s "$subnets_hex" | sort -n)"
 	[ -z "$subnets_hex" ] && { printf '%s\n' "aggregate_subnets: Failed to detect local subnets for family $family." >&2; return 1; }
 
 	subnets_hex="$subnets_hex$_nl"
@@ -180,7 +180,7 @@ aggregate_subnets() {
 	validate_ip "${res_ips%"$_nl"}" "$ip_regex" ||
 		{ echo "aggregate_subnets: Error: failed to validate one or more of output addresses." >&2; return 1; }
 
-	printf "%s" "$res_subnets"
+	printf %s "$res_subnets"
 
 	return 0
 }
@@ -191,7 +191,7 @@ _nl='
 '
 
 # convert to lower case
-[ -n "$family_arg" ] && family_arg="$(printf "%s" "$family_arg" | tr 'A-Z' 'a-z')"
+[ -n "$family_arg" ] && family_arg="$(printf %s "$family_arg" | tr 'A-Z' 'a-z')"
 
 case "$family_arg" in
 	inet) families="inet"; subnets_inet="$*" ;;
