@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC2154,SC2317,SC2086,SC2018,SC2019
+# shellcheck disable=SC2154,SC2317,SC2086,SC2018,SC2019,SC2048
 
 # Copyright: blunderful scripts
 # github.com/blunderful-scripts
@@ -26,7 +26,7 @@ me=$(basename "$0")
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 source_trim_subnet="true"
 
-. "$script_dir/trim-subnet.sh" || { echo "$me: Error: Can't source '$script_dir/trim-subnet.sh'." >&2; exit 1; }
+. "$script_dir/trim-subnet.sh" || { printf '%s\n' "$me: Error: Can't source '$script_dir/trim-subnet.sh'." >&2; exit 1; }
 . "$script_dir/ip-regex.sh"
 
 
@@ -55,7 +55,7 @@ aggregate_subnets() {
 
 	set_family_vars
 
-	# convert to _nl-delimited list, remove duplicates from input, convert to lower case
+	# convert to newline-delimited list, remove duplicates from input, convert to lower case
 	input_subnets="$(printf "%s" "$input_subnets" | tr ' ' '\n' | sort -u | tr 'A-Z' 'a-z')"
 	input_ips=''
 	for input_subnet in $input_subnets; do
@@ -66,16 +66,16 @@ aggregate_subnets() {
 	unset input_ips
 
 	for subnet in $input_subnets; do
-		case "$subnet" in */*) ;; *) echo "aggregate_subnets: Error: '$subnet' is not a valid subnet." >&2; return 1; esac
+		case "$subnet" in */*) ;; *) printf '%s\n' "aggregate_subnets: Error: '$subnet' is not a valid subnet." >&2; return 1; esac
 		# get mask bits
 		maskbits="${subnet#*/}"
-		case "$maskbits" in ''|*[!0-9]*) echo "aggregate_subnets: Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1;; esac
+		case "$maskbits" in ''|*[!0-9]*) printf '%s\n' "aggregate_subnets: Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1;; esac
 		# chop off mask bits
 		subnet="${subnet%%/*}"
 
 		# validate mask bits
 		case $(( (maskbits<8) | (maskbits>ip_len_bits)  )) in 1)
-			echo "aggregate_subnets: Error: invalid $family mask bits '$maskbits'." >&2; return 1
+			printf '%s\n' "aggregate_subnets: Error: invalid $family mask bits '$maskbits'." >&2; return 1
 		esac
 
 		# convert ip address to hex number
@@ -87,7 +87,7 @@ aggregate_subnets() {
 
 	# sort by mask bits
 	subnets_hex="$(printf "%s" "$subnets_hex" | sort -n)"
-	[ -z "$subnets_hex" ] && { echo "aggregate_subnets: Failed to detect local subnets for family $family." >&2; return 1; }
+	[ -z "$subnets_hex" ] && { printf '%s\n' "aggregate_subnets: Failed to detect local subnets for family $family." >&2; return 1; }
 
 	subnets_hex="$subnets_hex$_nl"
 	while true; do
@@ -197,7 +197,7 @@ case "$family_arg" in
 	inet) families="inet"; subnets_inet="$*" ;;
 	inet6 ) families="inet6"; subnets_inet6="$*" ;;
 	'' ) ;;
-	* ) echo "$me: Error: invalid family '$family_arg'." >&2; exit 1 ;;
+	* ) printf '%s\n' "$me: Error: invalid family '$family_arg'." >&2; exit 1 ;;
 esac
 
 # sort input subnets by family
@@ -221,15 +221,12 @@ for family in $families; do
 	subnets_regex="$subnets_regex($curr_regex)|"
 done
 subnets_regex="^(${subnets_regex%|})$"
-invalid_args="$(printf %s "$*" | tr ' ' '\n' | grep -vE "$subnets_regex" | tr '\n' ' ') "
-
-# trim extra whitespaces
-IFS_OLD="$IFS"; IFS=' '; set -- $invalid_args
-invalid_args="$*"
-IFS="$IFS_OLD"
+invalid_args="$(printf '%s\n' $* | grep -vE "$subnets_regex" | tr '\n' ' ')"
+# trim trailing whitespace
+invalid_args="${invalid_args% }"
 
 [ -n "$invalid_args" ] &&
-	{ echo "Error: These do not appear to be valid subnets for families '$families': '$invalid_args'" >&2; exit 1; }
+	{ printf '%s\n' "Error: These do not appear to be valid subnets for families '$families': '$invalid_args'" >&2; exit 1; }
 
 rv_global=0
 for family in $families; do

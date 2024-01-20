@@ -54,22 +54,21 @@ get_local_subnets() {
 		fi
 	)"
 
-	case "$local_addresses" in '')
-		echo "get_local_subnets(): Error detecting local addresses for family $family." >&2; return 1
-	esac
+	[ -z "$local_addresses" ] &&
+		{ printf '%s\n' "get_local_subnets(): Error detecting local addresses for family $family." >&2; return 1; }
 
-	case "$subnets_only" in '') printf '%s\n%s\n\n' "Local $family addresses:" "$local_addresses"; esac
+	[ -z "$subnets_only" ] && printf '%s\n%s\n\n' "Local $family addresses:" "$local_addresses"
 
 	local_subnets="$(sh "$script_dir/aggregate-subnets.sh" -f "$family" "$local_addresses")"; rv1=$?
 
 	case $rv1 in
-		0) [ -z "$subnets_only" ] && echo "Local $family subnets (aggregated):"
+		0) [ -z "$subnets_only" ] && printf '%s\n' "Local $family subnets (aggregated):"
 			case "$local_subnets" in
 				'') [ -z "$subnets_only" ] && echo "None found." ;;
-				*) printf "%s\n" "$local_subnets"
+				*) printf '%s\n' "$local_subnets"
 			esac
 		;;
-		*) echo "Error detecting $family subnets." >&2
+		*) printf '%s\n' "Error detecting $family subnets." >&2
 	esac
 	case "$subnets_only" in '') echo; esac
 
@@ -83,7 +82,7 @@ get_local_subnets() {
 case "$family_arg" in
 	inet|inet6 ) families="$family_arg" ;;
 	'' ) families="inet inet6" ;;
-	* ) echo "$me: Error: invalid family '$family_arg'." >&2; exit 1 ;;
+	* ) printf '%s\n' "$me: Error: invalid family '$family_arg'." >&2; exit 1 ;;
 esac
 
 rv=0

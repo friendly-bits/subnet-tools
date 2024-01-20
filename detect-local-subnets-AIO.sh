@@ -76,7 +76,7 @@ generate_mask() {
 			i="${i}1"
 		done
 		case "$((${#bytes_done}%chunk_len_bytes))" in 0) printf ' 0x'; esac
-		printf "%02x" "$sum" || { echo "generate_mask: Error: failed to convert byte '$sum' to hex." >&2; return 1; }
+		printf "%02x" "$sum" || { printf '%s\n' "generate_mask: Error: failed to convert byte '$sum' to hex." >&2; return 1; }
 		bytes_done="${bytes_done}1"
 
 		while true; do
@@ -99,12 +99,12 @@ validate_ip() {
 	# 2 if validation successful but for some reason it doesn't want to check the route ('permission denied')
 	for address in $addr; do
 		ip route get "$address" 1>/dev/null 2>/dev/null ||
-			{ echo "validate_ip: Error: ip address'$address' failed kernel validation." >&2; return 1; }
+			{ printf '%s\n' "validate_ip: Error: ip address'$address' failed kernel validation." >&2; return 1; }
 	done
 
 	## regex validation
-	printf "%s\n" "$addr" | grep -vE "^$ip_regex$" > /dev/null
-	[ $? != 1 ] && { echo "validate_ip: Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; }
+	printf '%s\n' "$addr" | grep -vE "^$ip_regex$" > /dev/null
+	[ $? != 1 ] && { printf '%s\n' "validate_ip: Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; }
 	return 0
 }
 
@@ -141,7 +141,7 @@ ip_to_hex() {
 # 3 - var name for output
 hex_to_ip() {
 	family="$2"; out_var="$3"
-	ip="$(IFS=' ' printf "%$_fmt_id$_fmt_delim" $1)" || { echo "hex_to_ip(): Error: failed to convert hex to ip." >&2; return 1; }
+	ip="$(IFS=' ' printf "%$_fmt_id$_fmt_delim" $1)" || { echo "hex_to_ip: Error: failed to convert hex to ip." >&2; return 1; }
 
 	case "$family" in inet6 )
 		## compress ipv6
@@ -172,7 +172,7 @@ get_local_subnets() {
 	case "$family" in
 		inet ) ip_len_bits=32; chunk_len_bits=8; ip_regex="$ipv4_regex"; _fmt_id='d'; _fmt_delim='.' ;;
 		inet6 ) ip_len_bits=128; chunk_len_bits=16; ip_regex="$ipv6_regex"; _fmt_id='x'; _fmt_delim=':' ;;
-		* ) echo "get_local_subnets: invalid family '$family'." >&2; return 1
+		* ) printf '%s\n' "get_local_subnets: invalid family '$family'." >&2; return 1
 	esac
 
 	ip_len_bytes=$((ip_len_bits/8))
@@ -197,7 +197,8 @@ get_local_subnets() {
 		done | sort -n
 	)"
 
-	[ -z "$subnets_hex" ] && { echo "get_local_subnets(): Failed to detect local subnets for family $family." >&2; return 1; }
+	[ -z "$subnets_hex" ] &&
+		{ printf '%s\n' "get_local_subnets(): Failed to detect local subnets for family $family." >&2; return 1; }
 
 	subnets_hex="$subnets_hex$_nl"
 	while true; do
@@ -317,7 +318,7 @@ get_local_subnets() {
 	[ ! "$subnets_only" ] && printf '%s\n' "Local $family subnets (aggregated):"
 	case "$res_subnets" in
 		'') [ ! "$subnets_only" ] && echo "None found." ;;
-		*) printf "%s" "$res_subnets"
+		*) printf %s "$res_subnets"
 	esac
 	[ ! "$subnets_only" ] && echo
 
@@ -345,7 +346,7 @@ case "$families_arg" in
 	''|'ipv4 ipv6'|'ipv6 ipv4' ) families="inet inet6" ;;
 	ipv4 ) families="inet" ;;
 	ipv6 ) families="inet6" ;;
-	* ) echo "$me: Error: invalid family '$families_arg'." >&2; exit 1 ;;
+	* ) printf '%s\n' "$me: Error: invalid family '$families_arg'." >&2; exit 1 ;;
 esac
 
 rv_global=0

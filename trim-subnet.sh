@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC2154,SC2086,SC2018,SC2019
+# shellcheck disable=SC2154,SC2086,SC2018,SC2019,SC2015
 
 # Copyright: blunderful scripts
 # github.com/blunderful-scripts
@@ -62,7 +62,7 @@ ip_to_hex() {
 # 2 - family
 # 3 - var name for output
 hex_to_ip() {
-	convert_failed() {  echo "hex_to_ip(): Error: failed to convert hex '$1' to ip." >&2; }
+	convert_failed() {  printf '%s\n' "hex_to_ip(): Error: failed to convert hex '$1' to ip." >&2; }
 	family="$2"; out_var="$3"
 
 	case "$family" in
@@ -118,7 +118,7 @@ generate_mask() {
 			i="${i}1"
 		done
 		case "$((${#bytes_done}%chunk_len_bytes))" in 0) printf ' 0x'; esac
-		printf "%02x" "$sum" || { echo "generate_mask: Error: failed to convert byte '$sum' to hex." >&2; return 1; }
+		printf "%02x" "$sum" || { printf '%s\n' "generate_mask: Error: failed to convert byte '$sum' to hex." >&2; return 1; }
 		bytes_done="${bytes_done}1"
 
 		while true; do
@@ -143,13 +143,13 @@ validate_ip() {
 		# 2 if validation successful but for some reason it doesn't want to check the route ('permission denied')
 		for address in $addr; do
 			ip route get "$address" 1>/dev/null 2>/dev/null ||
-				{ echo "validate_ip: Error: ip address'$address' failed kernel validation." >&2; return 1; }
+				{ printf '%s\n' "validate_ip: Error: ip address'$address' failed kernel validation." >&2; return 1; }
 		done
 	esac
 
 	## regex validation
 	printf "%s\n" "$addr" | grep -vE "^$ip_regex$" > /dev/null
-	[ $? != 1 ] && { echo "validate_ip: Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; }
+	[ $? != 1 ] && { printf '%s\n' "validate_ip: Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; }
 	return 0
 }
 
@@ -160,7 +160,7 @@ test_ip_route_get() {
 	case "$family" in
 		inet ) legal_addr="127.0.0.1"; illegal_addr="127.0.0.256" ;;
 		inet6 ) legal_addr="::1"; illegal_addr=":a:1" ;;
-		* ) echo "test_ip_route_get: Error: invalid family '$family'" >&2; return 1
+		* ) printf '%s\n' "test_ip_route_get: Error: invalid family '$family'" >&2; return 1
 	esac
 	rv_legal=0; rv_illegal=1
 
@@ -182,8 +182,8 @@ test_ip_route_get() {
 
 # calculates bitwise ip & mask, both represented as hex chunks, and outputs the result in the same format
 # arguments:
-# 1 - ip formatted as a hex chunks
-# 2 - mask formatted as a hex chunks
+# 1 - ip formatted as hex chunks
+# 2 - mask formatted as hex chunks
 # 3 - maskbits
 # 4 - ip length in bits (32 for ipv4, 128 for ipv6),
 # 5 - chunk size in bits used for calculation
@@ -220,39 +220,39 @@ bitwise_and() {
 
 set_family_vars() {
 	case "$family" in
-		'') echo "trim_subnet: Error: failed to detect the family for address '$ip'." >&2; return 1 ;;
+		'') printf '%s\n' "set_family_vars: Error: failed to detect the family for address '$ip'." >&2; return 1 ;;
 		inet ) ip_len_bits=32; chunk_len_bits=8; ip_regex="$ipv4_regex" ;;
 		inet6 ) ip_len_bits=128; chunk_len_bits=16; ip_regex="$ipv6_regex" ;;
-		* ) echo "trim_subnet: invalid family '$family'." >&2; return 1 ;;
+		* ) printf '%s\n' "set_family_vars: Error: invalid family '$family'." >&2; return 1 ;;
 	esac
 	ip_len_bytes=$((ip_len_bits/8))
 }
 
 trim_subnet() {
 	# convert to lower case
-	subnet="$(printf "%s" "$1" | tr 'A-Z' 'a-z')"
-	[ "$2" ] && family="$(printf "%s" "$2" | tr 'A-Z' 'a-z')"
+	subnet="$(printf %s "$1" | tr 'A-Z' 'a-z')"
+	[ "$2" ] && family="$(printf %s "$2" | tr 'A-Z' 'a-z')"
 
-	case "$subnet" in */*) ;; *) echo "trim_subnet: Error: '$subnet' is not a valid subnet." >&2; return 1; esac
+	case "$subnet" in */*) ;; *) printf '%s\n' "trim_subnet: Error: '$subnet' is not a valid subnet." >&2; return 1; esac
 	# get mask bits
 	maskbits="${subnet#*/}"
 	case "$maskbits" in ''|*[!0-9]*)
-		echo "trim_subnet: Error: input '$subnet' has no mask bits or it's not a number." >&2; return 1
+		printf '%s\n' "trim_subnet: Error: '$subnet' is not a valid subnet." >&2; return 1
 	esac
 	# chop off mask bits
 	ip="${subnet%%/*}"
 
 	# detect the family
 	if [ -z "$family" ]; then
-		printf "%s" "$ip" | grep -E "^${ipv4_regex}$" > /dev/null && family="inet"
-		printf "%s" "$ip" | grep -E "^${ipv6_regex}$" > /dev/null && family="inet6"
+		printf %s "$ip" | grep -E "^${ipv4_regex}$" > /dev/null && family="inet" ||
+		{ printf %s "$ip" | grep -E "^${ipv6_regex}$" > /dev/null && family="inet6"; }
 	fi
 
 	set_family_vars
 
 	# validate mask bits
 	case $(( (maskbits<8) | (maskbits>ip_len_bits)  )) in 1)
-		echo "trim_subnet: Error: invalid $family mask bits '$maskbits'." >&2; return 1
+		printf '%s\n' "trim_subnet: Error: invalid $family mask bits '$maskbits'." >&2; return 1
 	esac
 
 	test_ip_route_get "$family" || return 1
