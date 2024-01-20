@@ -33,7 +33,7 @@ fd16:1234:5678:ab::/64
 ```
 
 ## detect-local-subnets.sh
-Detects local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host). By default, outputs all found local ip addresses and aggregated subnets these addresses belong to.
+Detects local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host). Outputs all found local ip addresses and aggregated subnets these addresses belong to.
 Some heuristics are employed which are likely to work on Linux but for other Unixes, testing is recommended.
 Tested on Debian-based Linux distributions and on OpenWRT.
 
@@ -46,7 +46,7 @@ Options:
 `-f <family>`: only check subnets for specified family (`inet` for ipv4 or `inet6` for ipv6)
 
 ## detect-local-subnets-AIO.sh
-Same as above but as a stand-alone script (does not require aggregate-subnets.sh and trim-subnet.sh). Also works faster but skips printing found ip's (only prints the aggregated subnets).
+Same as above but as a stand-alone script (does not require aggregate-subnets.sh and trim-subnet.sh). Works faster but skips printing found ip's (only prints the aggregated subnets).
 
 ## Dependencies
 - **_grep_**, **_sed_**, **_tr_** and **_sort_**.
