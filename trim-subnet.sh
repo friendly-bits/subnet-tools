@@ -137,15 +137,17 @@ validate_ip() {
 	addr="$1"; ip_regex="$2"
 	[ ! "$addr" ] && { echo "validate_ip: Error: received an empty ip address." >&2; return 1; }
 
-	case "$ip_route_get_disable" in '')
+	[ -z "$ip_route_get_disable" ] && {
 		# using the 'ip route get' command to put the address through kernel's validation
 		# it normally returns 0 if the ip address is correct and it has a route, 1 if the address is invalid
-		# 2 if validation successful but for some reason it doesn't want to check the route ('permission denied')
+		# 2 if validation successful but for some reason it can't check the route
 		for address in $addr; do
-			ip route get "$address" 1>/dev/null 2>/dev/null ||
+			ip route get "$address" 1>/dev/null 2>/dev/null
+			case $? in 0|2) ;; *)
 				{ printf '%s\n' "validate_ip: Error: ip address'$address' failed kernel validation." >&2; return 1; }
+			esac
 		done
-	esac
+	}
 
 	## regex validation
 	printf "%s\n" "$addr" | grep -vE "^$ip_regex$" > /dev/null
