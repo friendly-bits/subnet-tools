@@ -190,17 +190,16 @@ aggregate_subnets() {
 _nl='
 '
 
-# convert to lower case
 [ -n "$family_arg" ] && family_arg="$(printf %s "$family_arg" | tr 'A-Z' 'a-z')"
 
 case "$family_arg" in
-	inet) families="inet"; subnets_inet="$*" ;;
-	inet6 ) families="inet6"; subnets_inet6="$*" ;;
+	inet|ipv4) families="inet"; subnets_inet="$*" ;;
+	inet6|ipv6) families="inet6"; subnets_inet6="$*" ;;
 	'' ) ;;
 	* ) printf '%s\n' "$me: Error: invalid family '$family_arg'." >&2; exit 1 ;;
 esac
 
-# sort input subnets by family
+# auto-detect families
 if [ -z "$family_arg" ]; then
 	subnets_inet="$(printf %s "$*" | tr ' ' '\n' | grep -E "^${subnet_regex_ipv4}$" | tr '\n' ' ')"
 	subnets_inet6="$(printf %s "$*" | tr ' ' '\n' | grep -E "^${subnet_regex_ipv6}$" | tr '\n' ' ')"
@@ -231,7 +230,6 @@ invalid_args="${invalid_args% }"
 rv_global=0
 for family in $families; do
 	test_ip_route_get "$family" || exit 1
-#	debugprint "Aggregating for family '$family'."
 	eval "subnets=\"\$subnets_$family\""
 	aggregate_subnets "$family" "$subnets"; rv_global=$((rv_global + $?))
 done
