@@ -31,10 +31,10 @@ script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 debugmode=''
 for arg in "$@"; do
 	case "$arg" in
-		-s ) subnets_only="true" ;;
-		-n ) novalidation="true" ;;
-		-d ) debugmode="true" ;;
-		-f ) families_arg="check" ;;
+		-s ) subnets_only=1 ;;
+		-n ) novalidation=1 ;;
+		-d ) debugmode=1 ;;
+		-f ) families_arg=check ;;
 		* ) case "$families_arg" in check) families_arg="$arg"; esac
 	esac
 done
@@ -96,10 +96,12 @@ validate_ip() {
 
 	# using the 'ip route get' command to put the address through kernel's validation
 	# it normally returns 0 if the ip address is correct and it has a route, 1 if the address is invalid
-	# 2 if validation successful but for some reason it doesn't want to check the route ('permission denied')
+	# 2 if validation successful but for some reason it can't check the route
 	for address in $addr; do
-		ip route get "$address" 1>/dev/null 2>/dev/null ||
+		ip route get "$address" 1>/dev/null 2>/dev/null
+		case $? in 0|2) ;; *)
 			{ printf '%s\n' "validate_ip: Error: ip address'$address' failed kernel validation." >&2; return 1; }
+		esac
 	done
 
 	## regex validation
@@ -187,7 +189,7 @@ get_local_subnets() {
 				ip -o -f inet addr show "$iface" | grep -oE "$subnet_regex_ipv4"
 			done
 		else
-			ip -o -f inet6 addr show | grep -oE "(fd[0-9a-f]{0,2}:|fe80:)(([[:alnum:]:/])+)" | grep -oE "^$subnet_regex_ipv6$"
+			ip -o -f inet6 addr show | grep -oE "inet6[[:space:]]+(fd[0-9a-f]{0,2}:|fe80:)(([[:alnum:]:/])+)" | grep -oE "$subnet_regex_ipv6$"
 		fi |
 
 		while read -r subnet; do
@@ -340,14 +342,15 @@ _nl='
 
 ## Main
 
-[ "$families_arg" ] && families_arg="$(printf %s "$families_arg" | tr 'A-Z' 'a-z')"
-case "$families_arg" in
-	inet|inet6|'inet inet6'|'inet6 inet' ) families="$families_arg" ;;
-	''|'ipv4 ipv6'|'ipv6 ipv4' ) families="inet inet6" ;;
-	ipv4 ) families="inet" ;;
-	ipv6 ) families="inet6" ;;
-	* ) printf '%s\n' "$me: Error: invalid family '$families_arg'." >&2; exit 1 ;;
-esac
+families=
+[ -n "$families_arg" ] && for word in $(printf '%s' "$families_arg" | tr 'A-Z' 'a-z'); do
+	case "$word" in
+		inet|ipv4) families="${families}inet " ;;
+		inet6|ipv6) families="${families}inet6 " ;;
+		*) printf '%s\n' "$me: Error: invalid family '$word'." >&2; exit 1
+	esac
+done
+: "${families:="inet inet6"}"
 
 rv_global=0
 for family in $families; do
