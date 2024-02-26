@@ -182,7 +182,7 @@ aggregate_subnets() {
 
 	printf %s "$res_subnets"
 
-	return 0
+	:
 }
 
 
