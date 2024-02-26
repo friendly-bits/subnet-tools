@@ -152,7 +152,7 @@ validate_ip() {
 	## regex validation
 	printf "%s\n" "$addr" | grep -vE "^$ip_regex$" > /dev/null
 	[ $? != 1 ] && { printf '%s\n' "validate_ip: Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; }
-	return 0
+	:
 }
 
 # tests whether 'ip route get' command works for ip validation
