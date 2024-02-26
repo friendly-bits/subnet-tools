@@ -1,10 +1,10 @@
 #!/bin/sh
 # shellcheck disable=SC2154,SC2086,SC2317,SC2018,SC2019
 
+# detect-local-subnets-AIO.sh
+
 # Copyright: friendly bits
 # github.com/friendly-bits
-
-# detect-local-subnets-AIO.sh
 
 # Unix shell script which uses standard utilities to detect local area ipv4 and ipv6 subnets, regardless of the device it's running on (router or host)
 # Some heuristics are employed which are likely to work on Linux but for other Unixes, testing is recommended
@@ -107,7 +107,7 @@ validate_ip() {
 	## regex validation
 	printf '%s\n' "$addr" | grep -vE "^$ip_regex$" > /dev/null
 	[ $? != 1 ] && { printf '%s\n' "validate_ip: Error: one or more addresses failed regex validation: '$addr'." >&2; return 1; }
-	return 0
+	:
 }
 
 # 1 - ip
@@ -324,7 +324,7 @@ get_local_subnets() {
 	esac
 	[ ! "$subnets_only" ] && echo
 
-	return 0
+	:
 }
 
 
