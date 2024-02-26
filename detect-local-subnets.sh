@@ -1,8 +1,8 @@
 #!/bin/sh
 # shellcheck disable=SC2018,SC2019
 
-# Copyright: blunderful scripts
-# github.com/blunderful-scripts
+# Copyright: friendly bits
+# github.com/friendly-bits
 
 # detect-local-subnets.sh
 

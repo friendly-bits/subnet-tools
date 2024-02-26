@@ -1,8 +1,8 @@
 #!/bin/sh
 # shellcheck disable=SC2154,SC2317,SC2086,SC2018,SC2019,SC2048
 
-# Copyright: blunderful scripts
-# github.com/blunderful-scripts
+# Copyright: friendly bits
+# github.com/friendly-bits
 
 # aggregate-subnets.sh
 
