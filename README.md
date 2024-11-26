@@ -41,6 +41,6 @@ Pipe input subnets (newline-separated) into aggregate_subnets. Example:
 - The library avoids using non-POSIX extensions of the aforementioned utilities, except for `grep -o` which technically is not POSIX-compliant but supported by most grep implementations.
 - Tested only on Linux. May or may not work on other UNIX-like operating systems.
 
-## Notes
+## P.s.
 - If you find any bugs or have a suggestion for code improvement, please let me know.
 - If you find this repository useful, please take a second to give it a star.
