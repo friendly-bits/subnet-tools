@@ -31,7 +31,6 @@ Pipe input subnets (newline-separated) into aggregate_subnets. Example:
 ## Dependencies
 - **ip** utility
 - **_grep_**, **_sed_**, **_tr_** and **_sort_**.
-- All scripts require the ip-regex.sh script which sets regex variables.
 
 ## Notes
 - Only use get_lan_subnets() and detect_lan_subnets() on a machine which has no dedicated WAN interfaces (physical or logical). Otherwise WAN subnet may be wrongly detected as LAN subnet.
