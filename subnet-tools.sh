@@ -64,7 +64,7 @@ ip_to_int() {
 	IFS_OLD_itoint="$IFS"
 	IFS=':'
 	set -- $ip_itoint
-	IFS_OLD_itoint="$IFS"
+	IFS="$IFS_OLD_itoint"
 
 	bits_processed=0
 	chunks_done=0
