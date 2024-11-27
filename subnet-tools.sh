@@ -144,7 +144,7 @@ int_to_ip() {
 }
 
 # converts input hex chunks into compressed ipv6 address
-# 1 - input: whitespace-delimited 16-bit hex chunks with ':' preceding each
+# 1 - input: 16-bit hex chunks with ':' preceding each
 # output via STDOUT (without newline)
 hex_to_ipv6() {
 	ip_hti="$1"
