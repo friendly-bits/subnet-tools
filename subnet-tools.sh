@@ -162,10 +162,7 @@ hex_to_ipv6() {
 
 	# trim leading colon if it's not a double colon
 	case "$ip_hti" in
-		::::*) ip_hti="${ip_hti#::}" ;;
-		:::*) ip_hti="${ip_hti#:}" ;;
-		::*) ;;
-		:*) ip_hti="${ip_hti#:}"
+		:[!:]*) ip_hti="${ip_hti#:}"
 	esac
 
 	printf %s "${ip_hti}"
