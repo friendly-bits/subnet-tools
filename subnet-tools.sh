@@ -42,7 +42,7 @@ ip_to_int() {
 
 	# ipv4
 	case "$family_itoint" in ipv4|inet)
-		# number of bits to shift
+		# number of bits to trim
 		bits_trim=$((32-ip2int_maskbits))
 
 		# convert ip to int and trim to mask bits
@@ -118,13 +118,17 @@ ip_to_int() {
 	:
 }
 
-# Converts input integer into ip address with optional mask bits
-# 1 - input ip address represented as integer
+# Converts input integer(s) into ip address with optional mask bits
+# For ipv6, input should be 8 whitespace-separated integer numbers
+# 1 - input ip address represented as integer(s)
 # 2 - family (ipv4|inet|ipv6|inet6)
 # 3 - optional: mask bits (integer). if specified, appends /[maskbits] to output
 int_to_ip() {
-	maskbits_iti=
-	[ "$3" ] && maskbits_iti="/$3"
+	case "$3" in
+		'') maskbits_iti='' ;;
+		*) maskbits_iti="/$3"
+	esac
+
 	case "$2" in
 		ipv4|inet)
 			set -- $(( ($1>>24)&255 )) $(( ($1>>16)&255 )) $(( ($1>>8)&255 )) $(($1 & 255))
@@ -136,8 +140,8 @@ int_to_ip() {
 
 			# convert to ipv6 and compress
 			{
-				IFS='' read -r ip1_hex
-				hex_to_ipv6 "$ip1_hex"
+				IFS='' read -r ip_iti_hex
+				hex_to_ipv6 "$ip_iti_hex"
 				printf '%s\n' "${maskbits_iti}"
 			}
 	esac
