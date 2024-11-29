@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# tests expand_ipv6(), compress_ipv6() and validate_ip()
+# tests ipv6 addresses expansion and compression
 
 #### Initial setup
 export LC_ALL=C
