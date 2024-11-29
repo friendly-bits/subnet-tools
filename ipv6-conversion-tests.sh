@@ -9,8 +9,7 @@ me=$(basename "$0")
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 
 export source_trim_subnet="true"
-# . "$script_dir/geoip-shell-lib-common.sh" || { echo "$me: Error: Can't source '$script_dir/geoip-shell-lib-common.sh'." >&2; exit 1; }
-. "$script_dir/subnet-tools.sh" || { echo "$me: Error: Can't source '$script_dir/subnet-tools.sh'." >&2; exit 1; }
+. "$script_dir/shell-ip-tools.sh" || { echo "$me: Error: Can't source '$script_dir/shell-ip-tools.sh'." >&2; exit 1; }
 
 test_exp_comp_ipv6() {
 
