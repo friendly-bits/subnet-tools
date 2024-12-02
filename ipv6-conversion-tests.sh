@@ -8,8 +8,7 @@ me=$(basename "$0")
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 
-export source_trim_subnet="true"
-. "$script_dir/shell-ip-tools.sh" || { echo "$me: Error: Can't source '$script_dir/shell-ip-tools.sh'." >&2; exit 1; }
+. "$script_dir/shell-ip-tools.sh" || { printf '%s\n' "$me: Error: Can't source '$script_dir/shell-ip-tools.sh'." >&2; exit 1; }
 
 test_exp_comp_ipv6() {
 
@@ -90,36 +89,34 @@ fd0e:2146:5cf5:4560::1 fd0e:2146:5cf5:4560::1
 	# remove extra spaces and tabs
 	tests="$(printf "%s" "$tests" | awk '{$1=$1};1')"
 
-	tests_num="$(echo "$tests" | wc -l)"
+    printf '%s\n' "$tests" |
+    {
+        test_status=0
+    	tests_done=0
+        while read -r line; do
+            in_ip="${line%% *}"
+            out_ip="${line#* }"
 
-	status_comp=0; status_exp=0
-	tests_done=0
+    		if [ -n "$in_ip" ] && [ -n "$out_ip" ]; then
+    			printf "%s" "."
 
-	for i in $(seq 1 "$tests_num" ); do
-		line="$(echo "$tests" | awk -v i="$i" 'NR==i{ print; }')"
-		expanded_ip="$(printf "%s" "$line" | cut -d' ' -f1 )"
-		compressed_ip="$(printf "%s" "$line" | cut -d' ' -f2 )"
+    			# convert to hex and back, compare result
+    			result="$(printf '%s\n' "$in_ip" | aggregate_subnets inet6)"
+    			if [ "${result%/128}" != "$out_ip" ]; then
+    				printf '%s\n' "Error with input '$in_ip'. Expected '$out_ip', got '$result'." >&2
+        			test_status=1
+    			fi
 
-		if [ -n "$expanded_ip" ] && [ -n "$compressed_ip" ]; then
-			printf "%s" "."
-
-			# convert to hex and back, compare result
-			result="$(printf '%s\n' "$expanded_ip" | aggregate_subnets inet6)"
-			if [ "${result%/128}" != "$compressed_ip" ]; then
-				echo "Error with input '$expanded_ip'. Expected '$compressed_ip', got '$result'."
-				status_exp=1
-			fi
-
-			tests_done=$((tests_done+1))
-		fi
-	done
-
-	return $((status_exp + status_comp))
+    			tests_done=$((tests_done+1))
+    		fi
+    	done
+        printf '\n%s\n' "Tests done: $tests_done"
+        exit $test_status
+    }
+    return $?
 }
 
 test_exp_comp_ipv6
 status=$?
 [ "$status" = 0 ] && noprob=" No problems detected."
-echo
-echo "Tests done: $tests_done"
-echo "Test status: $status.$noprob"
+printf '%s\n' "Test status: $status.$noprob"
