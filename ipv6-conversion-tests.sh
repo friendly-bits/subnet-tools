@@ -12,7 +12,7 @@ script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 
 test_exp_comp_ipv6() {
 
-tests=" \
+cat <<EOF |
 2001:4567:1212:00b2:0000:0000:0000:0000 2001:4567:1212:b2::
 2001:4567:1111:56ff:0000:0000:0000:0000 2001:4567:1111:56ff::
 2001:4567:1111:56ff:0000:0000:0000:0001 2001:4567:1111:56ff::1
@@ -70,7 +70,6 @@ fd0e:2146:5cf5:4560:0000:0000:0000:0001 fd0e:2146:5cf5:4560::1
 1:0:0:1:: 1:0:0:1::
 1::1:0:1:0:0: 1::1:0:1:0:0
 
-
 2001:4567:1212:b2:: 2001:4567:1212:b2::
 2001:4567:1111:56ff:: 2001:4567:1111:56ff::
 2001:4567:1111:56ff::1 2001:4567:1111:56ff::1
@@ -84,36 +83,34 @@ fd0e:2146:5cf5:4560::1 fd0e:2146:5cf5:4560::1
 2001:db8::1:0:0:1 2001:db8::1:0:0:1
 2001:db8::1 2001:db8::1
 2001:67c:2e8:25::c100:b18 2001:67c:2e8:25::c100:b18
-"
+EOF
 
 	# remove extra spaces and tabs
-	tests="$(printf "%s" "$tests" | awk '{$1=$1};1')"
+	awk '{$1=$1};1' |
+	{
+		test_status=0
+		tests_done=0
+		while read -r line; do
+			in_ip="${line%% *}"
+			out_ip="${line#* }"
 
-    printf '%s\n' "$tests" |
-    {
-        test_status=0
-    	tests_done=0
-        while read -r line; do
-            in_ip="${line%% *}"
-            out_ip="${line#* }"
+			if [ -n "$in_ip" ] && [ -n "$out_ip" ]; then
+				printf %s "."
 
-    		if [ -n "$in_ip" ] && [ -n "$out_ip" ]; then
-    			printf "%s" "."
+				# convert to hex and back, compare result
+				result="$(printf '%s\n' "$in_ip" | aggregate_subnets inet6)"
+				if [ "${result%/128}" != "$out_ip" ]; then
+					printf '%s\n' "Error with input '$in_ip'. Expected '$out_ip', got '${result%/128}'." >&2
+					test_status=1
+				fi
 
-    			# convert to hex and back, compare result
-    			result="$(printf '%s\n' "$in_ip" | aggregate_subnets inet6)"
-    			if [ "${result%/128}" != "$out_ip" ]; then
-    				printf '%s\n' "Error with input '$in_ip'. Expected '$out_ip', got '$result'." >&2
-        			test_status=1
-    			fi
-
-    			tests_done=$((tests_done+1))
-    		fi
-    	done
-        printf '\n%s\n' "Tests done: $tests_done"
-        exit $test_status
-    }
-    return $?
+				tests_done=$((tests_done+1))
+			fi
+		done
+		printf '\n%s\n' "Tests done: $tests_done"
+		exit $test_status
+	}
+	return $?
 }
 
 test_exp_comp_ipv6
