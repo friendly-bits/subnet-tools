@@ -131,8 +131,7 @@ int_to_ip() {
 
 	case "$2" in
 		ipv4|inet)
-			set -- $(( ($1>>24)&255 )) $(( ($1>>16)&255 )) $(( ($1>>8)&255 )) $(($1 & 255))
-			printf '%s\n' "${1}.${2}.${3}.${4}${maskbits_iti}" ;;
+			printf '%s\n' "$(( ($1>>24)&255 )).$(( ($1>>16)&255 )).$(( ($1>>8)&255 )).$(($1 & 255))${maskbits_iti}" ;;
 		ipv6|inet6)
 			# convert into 16-bit hex chunks delimited with ':'
 			set -- $1
